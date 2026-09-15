@@ -89,6 +89,26 @@ class InferenceConfig:
     # than reporting "a weed", because the species is what picks the chemical.
     collapse_labels_to: str | None = None
 
+    # --- green-on-brown backend (backend: greenonbrown) -------------------
+    # Classical vegetation-index thresholding, ported from OpenWeedLocator (MIT).
+    # No model, no training set, no accelerator -- and no ability to tell a weed
+    # from a crop plant. Only meaningful where green implies weed: fallow ground,
+    # stubble, pre-emergence. See inference/greenonbrown.py.
+    #
+    # `class_names` supplies the label; keep it [vegetation] unless you are
+    # deliberately asserting that green means weed on this ground.
+    # `confidence_threshold` applies, but note confidence here is index strength
+    # rather than a probability.
+    green_index: str = "exg"              # exg | exgr | nexg | maxg
+    green_threshold_mode: str = "absolute"  # absolute (explainable) | adaptive (OWL's)
+    green_index_min: float = 30.0
+    # 255, not OpenWeedLocator's 250: the indices saturate at 255, so pure
+    # sunlit vegetation lands exactly there and a 250 ceiling silently discards
+    # the greenest pixels in the frame.
+    green_index_max: float = 255.0
+    green_min_area_px: int = 100
+    green_max_detections: int = 50
+
     # Tiled inference: slice the frame into native-resolution tiles instead of
     # letterboxing the whole thing down to 640x640.
     #

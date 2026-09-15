@@ -464,6 +464,21 @@ def _build_backend(cfg) -> InferenceEngine | None:
     backend = (cfg.backend or "simulated").lower()
     if backend == "simulated":
         return SimulatedEngine()
+    if backend == "greenonbrown":
+        # Imported here rather than at module top so the backend stays optional
+        # and this module keeps its numpy-only import surface.
+        from .greenonbrown import GreenOnBrownEngine
+
+        return GreenOnBrownEngine(
+            index=cfg.green_index,
+            threshold_mode=cfg.green_threshold_mode,
+            index_min=cfg.green_index_min,
+            index_max=cfg.green_index_max,
+            min_area_px=cfg.green_min_area_px,
+            max_detections=cfg.green_max_detections,
+            label=(cfg.class_names[0] if cfg.class_names else "vegetation"),
+            confidence_threshold=cfg.confidence_threshold,
+        )
     if backend == "onnx":
         if cfg.model_path is None:
             raise ValueError("inference.model_path is required for the onnx backend.")

@@ -21,6 +21,8 @@ convenience.
 |---|---|---|
 | [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) (Megvii) | Apache-2.0 | Retain the copyright and licence notice; state changes. Closed-source distribution is permitted. |
 | [`LibreYOLO/weed-crop-aerial`](https://huggingface.co/datasets/LibreYOLO/weed-crop-aerial) | **CC BY 4.0** | **Attribution is required** — see below. Commercial use permitted. |
+| [OpenWeedLocator](https://github.com/geezacoleman/OpenWeedLocator) (Guy Coleman) | **MIT** | **Retain the copyright notice** — code is ported into `inference/greenonbrown.py`. Closed-source distribution permitted. |
+| [AgOpenGPS](https://github.com/AgOpenGPS-Official/AgOpenGPS) | Apache-2.0 | Retain notice if code is ported; consulted as a reference for section-control geometry. |
 | ONNX Runtime | MIT | Retain notice. |
 | NumPy, PyYAML, Pillow | BSD-3 / MIT / HPND | Retain notice. |
 | Picamera2 | BSD-2 | Retain notice. Pi runtime only. |
@@ -44,6 +46,29 @@ anything shipped, published, or demonstrated that was trained on it:
 The same text is written to `data/weed-crop-aerial/ATTRIBUTION.md` by
 `training/download_data.py`.
 
+## Projects used across a process boundary, not linked
+
+Three of the integrated projects are copyleft. **None of their code is linked into
+this codebase**, and the boundary in each case is a documented protocol rather
+than a language-level call:
+
+| Project | Licence | Boundary | Consequence |
+|---|---|---|---|
+| [ArduPilot](https://github.com/ArduPilot/ardupilot) | GPL-3.0 | Runs on the flight controller (or as SITL); **MAVLink** over serial/UDP | Separate program. Our talking MAVLink to it creates no derivative work, exactly as QGroundControl does not. |
+| [WebODM](https://github.com/OpenDroneMap/WebODM) | **AGPL-3.0** | Unmodified Docker service; **HTTP REST** | See the note below — AGPL's network clause is the one to understand. |
+| [farmOS](https://github.com/farmOS/farmOS) | GPL-2.0 | Unmodified Docker service; **JSON:API over HTTP** | Separate program, run as-is. Distributing it would carry GPL obligations; using it does not. |
+
+**The AGPL-3.0 point, stated plainly.** Section 13 obliges you to offer the
+source of *modified* AGPL software to users who interact with it over a network.
+Running WebODM internally to process your own flights triggers nothing at all. If
+you later expose WebODM's own interface to farmers as part of a service, the
+obligation is satisfied by offering its source — and since it is run **unmodified
+upstream**, that means linking to the upstream repository. It does not reach
+`agri_edge`, which is a separate program that talks to it over HTTP.
+
+If someone ever *patches* WebODM, that patched version becomes the thing whose
+source must be offered. Keep it unmodified and this stays trivial.
+
 ## Vendored code
 
 `vendor/` holds upstream repositories cloned via `gh` and is **gitignored**, so
@@ -53,6 +78,9 @@ from yours. Re-create it with:
 ```bash
 gh repo clone Megvii-BaseDetection/YOLOX vendor/YOLOX -- --depth 1
 gh repo clone hailo-ai/hailo-rpi5-examples vendor/hailo-rpi5-examples -- --depth 1
+gh repo clone geezacoleman/OpenWeedLocator vendor/OpenWeedLocator -- --depth 1
+gh repo clone AgOpenGPS-Official/AgOpenGPS vendor/AgOpenGPS -- --depth 1
+gh repo clone ArduPilot/ardupilot vendor/ardupilot -- --depth 1 --recurse-submodules
 ```
 
 ## Model weights
