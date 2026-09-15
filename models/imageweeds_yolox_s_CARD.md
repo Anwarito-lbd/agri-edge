@@ -171,5 +171,6 @@ running inference through the deployed `OnnxEngine`.*
 | **overall** | **0.1316** | **0.2463** | 306 |
 
 Inference latency: run `python training/benchmark.py --tiled --capture-width 4056`
-on the target device. Laptop CPU tiled ≈ 7.3 s/frame; measure on the Pi with the
-Hailo backend before setting any flight parameter.
+on the target device. Laptop CPU tiled measured 7.3 s/frame idle and 35.4 s/frame
+under load — an order of magnitude, not a specification. Measure on the Pi with
+the Hailo backend before setting any flight parameter.

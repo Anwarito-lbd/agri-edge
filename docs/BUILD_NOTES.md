@@ -64,9 +64,21 @@ Model 2 (`training/exps/imageweeds_yolox_s.py`) targets this directly.
 
 ### The AI HAT+ is now required, not optional
 
-Tiling a full 4056 px frame is 48 inferences. Measured on laptop CPU that is
-**7.3 s per frame — 0.14 FPS, capping ground speed at 1.5 m/s (6 km/h)**. Not a
-survey flight. The Pi's CPU is slower still.
+Tiling a full 4056 px frame is 48 inferences. Measured on an idle laptop CPU that
+is **7.3 s per frame — 0.14 FPS, capping ground speed at 1.5 m/s (6 km/h)**. Not
+a survey flight. The Pi's CPU is slower still.
+
+**Treat that figure as an order of magnitude, not a specification.** Re-run on
+15 Sept on the same laptop *while training occupied the machine* it measured
+**35.4 s per frame (0.03 FPS, 0.2 m/s)** — 4.8× worse, purely from CPU
+contention. So the honest range for "tiled inference on a CPU" is seconds to
+tens of seconds depending on what else is running, and the Pi sits at the
+unfavourable end of it.
+
+None of that changes the decision: every value in that range is one to two orders
+of magnitude below survey speed. The conclusion is robust precisely *because* the
+measurement is not. **The only number worth planning a flight around is measured
+on the board**, with nothing else running.
 
 On the Hailo NPU the constraint disappears:
 
