@@ -16,5 +16,5 @@
   "checkpoint": "YOLOX_outputs\\weed_crop_yolox_s\\best_ckpt.pth",
   "decode": "raw head; decode + NMS on host via agri_edge.inference.yolox",
   "validated_locally": false,
-  "validation_notes": "Trained on Roboflow-100 aerial imagery (Australian/US provenance, 95% weed / 5% crop class balance). NOT validated on Canadian field imagery. Decision support only."
+  "validation_notes": "NOT aerial despite the name: ground-level close-ups plus indoor propagation trays, and 98.3% of `crop` labels come from the trays. Effectively a seedling detector at ~30-80 cm range. Class balance 95% weed / 5% crop. NOT validated on Canadian field imagery. Decision support only."
 }

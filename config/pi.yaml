@@ -49,14 +49,18 @@ inference:
   #          hailo  -> the AI HAT NPU. Needs a .hef from scripts/hailo_compile.sh
   #                    and `sudo apt install hailo-all`.
   backend: onnx
-  model_path: models/weed_crop_yolox_s.onnx
+  # The species model, NOT weed_crop_yolox_s. That one was trained on
+  # ground-level close-ups and indoor seed trays -- one of its own test images
+  # contains a person's boot -- so it is a seedling detector, not a field model.
+  # This one was verified as genuine nadir aerial imagery before training.
+  model_path: models/imageweeds_yolox_s.onnx
 
   # 0.30 is a scouting threshold: it tolerates false positives because a human
   # reviews the output. Raise it before anything downstream acts automatically.
   confidence_threshold: 0.30
 
   input_size: [640, 640]
-  class_names: [crop, weed]
+  class_names: [ragweed, waterhemp, horseweed, redrootpigweed, kochia]
 
   # Report every detection under one label, keeping the model's own prediction in
   # the sidecar as `source_label`. Leave null to report the model's classes.
@@ -66,7 +70,7 @@ inference:
   # boxes are right -- collapsing takes measured AP@.50 from 0.246 to 0.520.
   # Claiming a species we cannot support is worse than saying "a weed", because
   # the species is what picks the chemical. See models/imageweeds_yolox_s_CARD.md.
-  collapse_labels_to: null
+  collapse_labels_to: weed
 
   # TILED INFERENCE -- for small targets this is not an optimisation, it is the
   # difference between detectable and invisible.

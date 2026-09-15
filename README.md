@@ -9,7 +9,7 @@ store-and-forward transfer. Runs fully simulated on a laptop with no hardware.
 
 ```bash
 pip install -e ".[dev]"
-python -m pytest                                    # 333 tests, no hardware needed
+python -m pytest                                    # 347 tests, no hardware needed
 agri-edge -c config/example.yaml preflight --simulate
 agri-edge -c config/example.yaml fly --simulate --frames 20
 ```
@@ -294,7 +294,7 @@ docs/BUILD_NOTES.md         Findings, problems hit, and what to do next
 docs/USE_CASES.md           Roadmap: what is free, what is weeks, what is a company
 docs/source/                The original research report
 docs/briefs/                Critique, one-pager, procurement memo, compliance checklist
-tests/                      333 tests, all hardware-free
+tests/                      347 tests, all hardware-free
 ```
 
 ## Commands

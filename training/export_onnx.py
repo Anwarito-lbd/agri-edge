@@ -38,13 +38,88 @@ import torch
 from torch import nn
 
 
-def build_meta(name: str, class_names: list[str], ckpt_path: Path, input_size) -> dict:
+# Per-dataset provenance, keyed on the experiment's `data_dir` basename.
+#
+# This used to be one hardcoded entry, which meant EVERY exported model claimed
+# to be trained on weed-crop-aerial -- including a COCO model and a model trained
+# on an entirely different dataset. That is not merely untidy: two of these
+# datasets are CC BY 4.0, whose attribution is a licence obligation that must
+# follow the product, so crediting the wrong one is a compliance failure as well
+# as a provenance lie.
+#
+# An unknown dataset raises rather than defaulting. A missing attribution is a
+# problem you notice; a confidently wrong one is not.
+DATASET_PROVENANCE: dict[str, dict] = {
+    "weed-crop-aerial": {
+        "trained_on": [
+            "LibreYOLO/weed-crop-aerial (CC BY 4.0) -- credit Roboflow 100 / Roboflow Universe"
+        ],
+        "validation_notes": (
+            "NOT aerial despite the name: ground-level close-ups plus indoor propagation "
+            "trays, and 98.3% of `crop` labels come from the trays. Effectively a seedling "
+            "detector at ~30-80 cm range. Class balance 95% weed / 5% crop. NOT validated "
+            "on Canadian field imagery. Decision support only."
+        ),
+    },
+    "imageweeds": {
+        "trained_on": [
+            "Project-AgML/ImageWeeds_aerial_weed_detection (CC BY 4.0) -- credit Rai, N., "
+            "Villamil Mahecha, M., Christensen, A., Quanbeck, J., Zhang, Y., Howatt, K., "
+            "Ostlie, M., Sun, X. 'Multi-format open-source weed image dataset for real-time "
+            "weed identification in precision agriculture.' Data in Brief 51 (2023), 109691"
+        ],
+        "validation_notes": (
+            "Genuine nadir aerial imagery, verified by inspection. Only transplanted potted "
+            "specimens are annotated -- natural weeds in every frame are unlabelled and train "
+            "as background, so recall is capped by the annotation and measured precision "
+            "understates reality. The species head collapsed: 76% of test predictions are "
+            "horseweed (14% of ground truth). Localisation is sound -- scored as a single "
+            "class, AP@.50 is 0.520 against 0.246 for species. Run it with "
+            "inference.collapse_labels_to: weed. One site, one season. NOT validated on "
+            "Canadian field imagery. Decision support only."
+        ),
+    },
+    "aerial-sheep": {
+        "trained_on": [
+            "Aerial Sheep Dataset by Riis, via Roboflow Universe (Public Domain) -- "
+            "mirrored as keremberke/aerial-sheep-object-detection"
+        ],
+        "validation_notes": (
+            "Public Domain: no attribution obligation follows this model. Genuine nadir "
+            "aerial imagery, splits verified free of augmentation leakage. Trained on sheep, "
+            "which are the conservative case for cattle. NOT validated on Canadian field "
+            "imagery. Decision support only."
+        ),
+    },
+}
+
+
+def build_meta(
+    name: str,
+    class_names: list[str],
+    ckpt_path: Path,
+    input_size,
+    dataset: str,
+) -> dict:
+    """Assemble the provenance sidecar `ModelMetadata.load_beside` reads.
+
+    `dataset` is the exp's data_dir basename and is required, because the
+    experiment is the only thing that knows which imagery a checkpoint saw.
+    """
+    try:
+        prov = DATASET_PROVENANCE[dataset]
+    except KeyError:
+        raise SystemExit(
+            f"No provenance entry for dataset '{dataset}'. "
+            f"Add one to DATASET_PROVENANCE in {__file__}, including its licence and "
+            f"any required attribution. Exporting a model with unknown or borrowed "
+            f"provenance is how a CC BY obligation gets silently dropped."
+        ) from None
+
     return {
         "name": name,
         "version": "0.1.0",
-        "trained_on": [
-            "LibreYOLO/weed-crop-aerial (CC BY 4.0) -- credit Roboflow 100 / Roboflow Universe",
-        ],
+        "trained_on": prov["trained_on"],
         "class_names": class_names,
         "input_size": list(input_size),
         "architecture": "YOLOX-s (Apache-2.0, Megvii)",
@@ -56,11 +131,7 @@ def build_meta(name: str, class_names: list[str], ckpt_path: Path, input_size) -
         # false, output is decision support and must not drive chemical
         # application. Flipping it is a deliberate act, not a build step.
         "validated_locally": False,
-        "validation_notes": (
-            "Trained on Roboflow-100 aerial imagery (Australian/US provenance, 95% weed "
-            "/ 5% crop class balance). NOT validated on Canadian field imagery. "
-            "Decision support only."
-        ),
+        "validation_notes": prov["validation_notes"],
     }
 
 
@@ -115,9 +186,15 @@ def main() -> int:
             file=sys.stderr,
         )
 
+    # The exp knows which data the checkpoint saw; nothing else does.
+    dataset = Path(str(exp.data_dir)).name
+
     meta_path = args.output.with_suffix(args.output.suffix + ".meta.json")
     meta_path.write_text(
-        json.dumps(build_meta(args.output.stem, class_names, args.ckpt, (h, w)), indent=2),
+        json.dumps(
+            build_meta(args.output.stem, class_names, args.ckpt, (h, w), dataset),
+            indent=2,
+        ),
         encoding="utf-8",
     )
 

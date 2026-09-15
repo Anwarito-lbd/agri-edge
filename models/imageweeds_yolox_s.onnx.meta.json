@@ -2,7 +2,7 @@
   "name": "imageweeds_yolox_s",
   "version": "0.1.0",
   "trained_on": [
-    "LibreYOLO/weed-crop-aerial (CC BY 4.0) -- credit Roboflow 100 / Roboflow Universe"
+    "Project-AgML/ImageWeeds_aerial_weed_detection (CC BY 4.0) -- credit Rai, N., Villamil Mahecha, M., Christensen, A., Quanbeck, J., Zhang, Y., Howatt, K., Ostlie, M., Sun, X. 'Multi-format open-source weed image dataset for real-time weed identification in precision agriculture.' Data in Brief 51 (2023), 109691"
   ],
   "class_names": [
     "ragweed",
@@ -19,5 +19,5 @@
   "checkpoint": "YOLOX_outputs\\imageweeds_yolox_s\\best_ckpt.pth",
   "decode": "raw head; decode + NMS on host via agri_edge.inference.yolox",
   "validated_locally": false,
-  "validation_notes": "Trained on Roboflow-100 aerial imagery (Australian/US provenance, 95% weed / 5% crop class balance). NOT validated on Canadian field imagery. Decision support only."
+  "validation_notes": "Genuine nadir aerial imagery, verified by inspection. Only transplanted potted specimens are annotated -- natural weeds in every frame are unlabelled and train as background, so recall is capped by the annotation and measured precision understates reality. The species head collapsed: 76% of test predictions are horseweed (14% of ground truth). Localisation is sound -- scored as a single class, AP@.50 is 0.520 against 0.246 for species. Run it with inference.collapse_labels_to: weed. One site, one season. NOT validated on Canadian field imagery. Decision support only."
 }

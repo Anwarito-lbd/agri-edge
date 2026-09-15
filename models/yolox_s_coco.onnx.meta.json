@@ -2,7 +2,7 @@
   "name": "yolox_s_coco",
   "version": "0.1.0",
   "trained_on": [
-    "LibreYOLO/weed-crop-aerial (CC BY 4.0) -- credit Roboflow 100 / Roboflow Universe"
+    "COCO 2017 (Microsoft) -- images CC BY 4.0 / Flickr terms, annotations CC BY 4.0. Stock YOLOX-s weights from Megvii (Apache-2.0); no agricultural data involved."
   ],
   "class_names": [
     "person",
@@ -94,5 +94,5 @@
   "checkpoint": "weights\\yolox_s.pth",
   "decode": "raw head; decode + NMS on host via agri_edge.inference.yolox",
   "validated_locally": false,
-  "validation_notes": "Trained on Roboflow-100 aerial imagery (Australian/US provenance, 95% weed / 5% crop class balance). NOT validated on Canadian field imagery. Decision support only."
+  "validation_notes": "Stock COCO detector, exported unchanged as a pipeline smoke-test model. It detects none of this project's targets -- no weed, crop or prairie species class exists in COCO. Its `sheep` and `cow` classes are ground-level-trained and are NOT the livestock model. Never deploy this for agronomy. Decision support only."
 }

@@ -61,7 +61,7 @@ gh repo clone hailo-ai/hailo-rpi5-examples vendor/hailo-rpi5-examples -- --depth
 Megvii under Apache-2.0. Models fine-tuned from it inherit no copyleft
 obligation, but the YOLOX attribution above still applies.
 
-## Second dataset — ImageWeeds (species model)
+## Training datasets (2 of 3) — ImageWeeds, the species model
 
 | Component | Licence | What you must do |
 |---|---|---|
@@ -78,3 +78,30 @@ Written by `training/prepare_imageweeds.py` to `data/imageweeds/ATTRIBUTION.md`.
 
 `datasets` (Hugging Face) is Apache-2.0 and is a **training-only** dependency —
 it never reaches the Pi.
+
+## Training datasets (3 of 3) — Aerial Sheep, the livestock model
+
+| Component | Licence | What you must do |
+|---|---|---|
+| [Aerial Sheep Dataset](https://universe.roboflow.com/riis/aerial-sheep) (Riis, via Roboflow Universe) | **Public Domain** | **Nothing.** No attribution obligation follows the model. |
+
+Credited anyway in `data/aerial-sheep/ATTRIBUTION.md`, because it costs nothing:
+
+> Aerial Sheep Dataset by Riis, via Roboflow Universe (2022). Public Domain.
+> Mirrored on Hugging Face as `keremberke/aerial-sheep-object-detection`.
+
+This is the **only** model here whose output carries no attribution obligation —
+worth remembering when deciding what to demonstrate publicly first.
+
+## Where the obligations actually live
+
+Attribution has to travel with the *model*, not just the repo, because a model
+file can be copied out of here and deployed on its own. So each model's
+`.meta.json` sidecar carries its own `trained_on` credit, and
+`training/export_onnx.py` derives it from the experiment's dataset — refusing to
+export at all if the dataset has no registered provenance.
+
+That refusal exists because the sidecars were once **all wrong in the same way**:
+a hardcoded default meant every model, including a stock COCO detector, claimed
+to be trained on `weed-crop-aerial`. `tests/test_provenance.py` now holds the
+line.

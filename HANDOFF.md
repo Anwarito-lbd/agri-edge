@@ -25,7 +25,7 @@ posture. See [NOTICE.md](NOTICE.md).
 
 ## Current progress
 
-**333 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
+**347 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
 
 ### Working
 
@@ -35,6 +35,7 @@ posture. See [NOTICE.md](NOTICE.md).
 | YOLOX decode/letterbox/NMS, pure numpy | Verified against YOLOX's own torch impl to 1e-5 |
 | Tiled inference | Measured 2.3× more detections than whole-frame |
 | Label collapsing | Report a coarse label, keep the model's own class as `source_label` |
+| Model provenance | Derived per dataset; an unregistered dataset refuses to export |
 | Store-and-forward uploader | Metadata-first, priority-ordered, stdlib only |
 | Environmental sensing (BME280) | Temp/humidity/pressure + dew point + VPD + spray advisory |
 | Read-only MAVLink telemetry | Safety contract enforced by test |
@@ -154,13 +155,21 @@ wearing a label it could not support.
 12. **Don't run the full test suite while training.** `cv2.resize` in
    `test_yolox_postprocess.py` flaked once under memory pressure. Not a code bug.
    (Re-run on 15 Sept during training: 333 passed, no flakes.)
-13. **An abrupt kill looks nothing like a crash.** On 15 Sept the livestock run
+13. **`export_onnx.py` hardcoded `trained_on`, so every sidecar was wrong.**
+   All three models claimed `weed-crop-aerial` -- including the stock COCO model
+   and the species model, which owes CC BY credit to a *different* paper (Rai et
+   al. 2023). A wrong CC BY credit is a compliance failure, not untidiness.
+   Provenance is now keyed on the exp's `data_dir` and an unregistered dataset
+   **raises** rather than defaulting (`DATASET_PROVENANCE`), because a
+   confidently wrong attribution is worse than a missing one.
+   `tests/test_provenance.py` holds it.
+14. **An abrupt kill looks nothing like a crash.** On 15 Sept the livestock run
    was found dead at epoch 35/60 with **no error in the log** — the log's tail was
    nulls and `last_epoch_ckpt.pth` was a truncated 108 KB. That is the signature
    of the process being killed mid-write (session restart), not a CUDA fault.
    `latest_ckpt.pth` was intact, so `train_resilient.py` resumed at a cost of one
    epoch. **Check the log tail for nulls before hunting for an exception.**
-14. **`nvidia-smi` clock readings are unreliable on this laptop.** It reported
+15. **`nvidia-smi` clock readings are unreliable on this laptop.** It reported
    22–44 MHz of 3090 with *no throttle reason active*, while YOLOX logged
    2.5 s/iter; an hour later, same reported clock (217 MHz), 0.264 s/iter — near
    full speed. **Trust `iter_time` in the training log, not the clock query.**
