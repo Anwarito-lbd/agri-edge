@@ -1,0 +1,717 @@
+<title>Canadian Agricultural RPAS Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /* ---- tokens: complete light palette on bare :root ----
+     Palette derives from the false-colour infrared composite that multispectral
+     agriculture is actually read in: healthy canopy renders crimson, soil renders
+     cool grey-green. Neutrals carry a deliberate green bias. */
+  :root {
+    --ground:    #EFF1EE;
+    --surface:   #FFFFFF;
+    --surface-2: #E7EAE6;
+    --ink:       #16191C;
+    --ink-2:     #3C4642;
+    --muted:     #5E6B64;
+    --rule:      #D3D9D3;
+    --rule-firm: #B4BEB6;
+
+    --accent:    #A81D26;  /* NIR crimson */
+    --accent-ink:#8A1620;
+    --accent-wash:#F7E8E7;
+
+    --verified:  #1F6B45;
+    --verified-wash:#E4EFE8;
+    --caution:   #8A5A0C;
+    --caution-wash:#F5EBDA;
+
+    --shadow: 0 1px 2px rgba(22,25,28,.06), 0 8px 24px -12px rgba(22,25,28,.14);
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+    --measure: 66ch;
+  }
+
+  /* system-dark (no stamp) — guarded so an explicit light choice wins */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #111614;
+      --surface:   #181E1B;
+      --surface-2: #202823;
+      --ink:       #E7EDE8;
+      --ink-2:     #C3CDC6;
+      --muted:     #93A199;
+      --rule:      #2A332D;
+      --rule-firm: #3C4841;
+
+      --accent:    #EE6B6E;
+      --accent-ink:#F4908F;
+      --accent-wash:#2C1A1B;
+
+      --verified:  #57B583;
+      --verified-wash:#152420;
+      --caution:   #D9A24A;
+      --caution-wash:#26200F;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+
+  /* explicit dark choice */
+  :root[data-theme="dark"] {
+    --ground:    #111614;
+    --surface:   #181E1B;
+    --surface-2: #202823;
+    --ink:       #E7EDE8;
+    --ink-2:     #C3CDC6;
+    --muted:     #93A199;
+    --rule:      #2A332D;
+    --rule-firm: #3C4841;
+
+    --accent:    #EE6B6E;
+    --accent-ink:#F4908F;
+    --accent-wash:#2C1A1B;
+
+    --verified:  #57B583;
+    --verified-wash:#152420;
+    --caution:   #D9A24A;
+    --caution-wash:#26200F;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 940px;
+    margin-inline: auto;
+    padding-inline: 20px;
+    padding-block: 0 72px;
+  }
+
+  /* ---------- type ---------- */
+  h1, h2, h3, h4 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.14; }
+  h1 { font-size: clamp(2.1rem, 5.2vw, 3.25rem); letter-spacing: -.022em; }
+  h2 { font-size: clamp(1.4rem, 3vw, 1.85rem); letter-spacing: -.014em; }
+  h3 { font-size: 1.1rem; letter-spacing: -.006em; }
+  h4 { font-size: .95rem; letter-spacing: -.004em; }
+  p { margin: 0; max-width: var(--measure); }
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  strong { font-weight: 600; }
+  code, .mono { font-family: var(--mono); font-size: .88em; font-variant-ligatures: none; }
+
+  .eyebrow {
+    font-family: var(--display);
+    font-size: .69rem;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .lede { font-size: 1.22rem; line-height: 1.5; color: var(--ink-2); max-width: 62ch; }
+
+  /* ---------- masthead ---------- */
+  header.mast {
+    border-bottom: 2px solid var(--ink);
+    padding-block: 52px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .mast-top { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: baseline; justify-content: space-between; }
+  .stamp {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+  .stamp b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---------- verification strip ---------- */
+  .tally {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin-top: 34px;
+  }
+  .tally > div {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .tally .n {
+    font-family: var(--display);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+  }
+  .tally .n.ok  { color: var(--verified); }
+  .tally .n.bad { color: var(--accent); }
+  .tally .n.gap { color: var(--caution); }
+  .tally small { font-size: .8rem; color: var(--muted); line-height: 1.38; }
+
+  section { margin-top: 64px; }
+  .sec-head { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; }
+  .sec-head p { color: var(--ink-2); }
+  .stack { display: flex; flex-direction: column; gap: 18px; }
+  .stack-tight { display: flex; flex-direction: column; gap: 10px; }
+
+  /* ---------- chronology ---------- */
+  .chrono { display: flex; flex-direction: column; gap: 0; border-left: 2px solid var(--rule-firm); }
+  .chrono-row {
+    display: grid;
+    grid-template-columns: 116px 1fr;
+    gap: 4px 20px;
+    padding: 15px 0 15px 20px;
+    position: relative;
+    border-bottom: 1px solid var(--rule);
+  }
+  .chrono-row:last-child { border-bottom: 0; }
+  .chrono-row::before {
+    content: "";
+    position: absolute;
+    left: -6px; top: 22px;
+    width: 10px; height: 10px;
+    background: var(--rule-firm);
+    border-radius: 50%;
+  }
+  .chrono-row.live::before { background: var(--accent); }
+  .chrono-row.pending::before { background: var(--surface); border: 2px solid var(--caution); }
+  .chrono-date { font-family: var(--mono); font-size: .8rem; color: var(--muted); padding-top: 3px; font-variant-numeric: tabular-nums; }
+  .chrono-body { display: flex; flex-direction: column; gap: 5px; }
+  .chrono-body p { font-size: .97rem; color: var(--ink-2); }
+
+  /* ---------- findings ---------- */
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .finding.gapnote { border-left-color: var(--caution); }
+  .finding-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .chip {
+    font-family: var(--display);
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    color: var(--accent-ink);
+    background: var(--accent-wash);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    white-space: nowrap;
+  }
+  .chip.caution { color: var(--caution); background: var(--caution-wash); border-color: color-mix(in srgb, var(--caution) 32%, transparent); }
+  .chip.ok { color: var(--verified); background: var(--verified-wash); border-color: color-mix(in srgb, var(--verified) 30%, transparent); }
+  .swap { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  @media (min-width: 660px) { .swap { grid-template-columns: 1fr 1fr; } }
+  .swap > div { padding: 12px 14px; background: var(--surface-2); display: flex; flex-direction: column; gap: 5px; }
+  .swap .k { font-family: var(--display); font-size: .66rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .swap .said { color: var(--ink-2); font-size: .95rem; }
+  .swap .fix { color: var(--ink); font-size: .95rem; font-weight: 600; }
+  .so-what { font-size: .95rem; color: var(--ink-2); border-top: 1px solid var(--rule); padding-top: 11px; }
+  .so-what b { font-family: var(--display); font-size: .66rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); display: block; margin-bottom: 3px; }
+
+  /* ---------- ladder (a real gated sequence, so numbered) ---------- */
+  .ladder { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .rung {
+    background: var(--surface);
+    padding: 17px 20px;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 6px 16px;
+    align-items: start;
+  }
+  @media (min-width: 720px) {
+    .rung { grid-template-columns: 34px minmax(0,1fr) 132px; }
+  }
+  .rung-n { font-family: var(--mono); font-size: .95rem; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .rung-main { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .rung-main h4 { font-size: 1rem; }
+  .rung-gate { font-size: .89rem; color: var(--muted); }
+  .rung-gate b { color: var(--ink-2); font-weight: 600; font-family: var(--display); font-size: .66rem; letter-spacing: .09em; text-transform: uppercase; display: block; }
+  .rung-cost { font-family: var(--mono); font-size: .88rem; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+  @media (min-width: 720px) { .rung-cost { text-align: right; } }
+  .rung.approved { background: var(--verified-wash); }
+
+  /* ---------- tables ---------- */
+  .tbl-scroll { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .94rem; min-width: 520px; }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-family: var(--display); font-size: .67rem; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    background: var(--surface-2); border-bottom: 1px solid var(--rule-firm);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.num.hero { color: var(--accent); font-weight: 600; }
+
+  /* ---------- chart ---------- */
+  figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .chart-box { background: var(--surface); border: 1px solid var(--rule); padding: 20px 18px 14px; overflow-x: auto; }
+  .chart-box svg { display: block; width: 100%; max-width: 100%; height: auto; min-width: 460px; }
+  figcaption { font-size: .88rem; color: var(--muted); max-width: var(--measure); }
+
+  /* ---------- rules ---------- */
+  .rules { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  @media (min-width: 780px) { .rules { grid-template-columns: repeat(3, 1fr); } }
+  .rule-card { background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 9px; }
+  .rule-card .mark { font-family: var(--mono); font-size: .76rem; color: var(--accent); font-weight: 600; }
+  .rule-card p { font-size: .94rem; color: var(--ink-2); max-width: none; }
+
+  /* ---------- callout ---------- */
+  .callout {
+    border-top: 2px solid var(--accent);
+    background: var(--surface);
+    padding: 22px 24px;
+    display: flex; flex-direction: column; gap: 11px;
+  }
+  .callout p { max-width: 60ch; }
+
+  .arch { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .arch-row { background: var(--surface); padding: 15px 18px; display: grid; grid-template-columns: 1fr; gap: 4px; }
+  @media (min-width: 700px) { .arch-row { grid-template-columns: 190px 1fr; gap: 18px; } }
+  .arch-where { font-family: var(--display); font-weight: 700; font-size: .95rem; }
+  .arch-where span { display: block; font-family: var(--mono); font-size: .74rem; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .arch-what { font-size: .94rem; color: var(--ink-2); }
+
+  ul.plain { margin: 0; padding-left: 1.15em; max-width: var(--measure); display: flex; flex-direction: column; gap: 7px; }
+  ul.plain li { color: var(--ink-2); }
+
+  footer {
+    margin-top: 68px; padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-size: .85rem; color: var(--muted);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  footer a { color: var(--muted); }
+  .src { display: flex; flex-wrap: wrap; gap: 4px 16px; font-family: var(--mono); font-size: .76rem; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div class="mast-top">
+      <span class="eyebrow">Verified decision brief</span>
+      <span class="eyebrow">Transport Canada Part IX &middot; PMRA</span>
+    </div>
+    <h1>Drones on Canadian farms, fact-checked</h1>
+    <p class="lede">A research report recommended a three-tier drone fleet, a Raspberry&nbsp;Pi edge stack and six budget scenarios. Its prices were accurate to the dollar. Four of its regulatory claims were not.</p>
+    <div class="stamp">
+      <span><b>Reviewed</b> 13 Sept 2026</span>
+      <span><b>Re-verify before</b> 31 Mar 2027</span>
+      <span><b>Scope</b> RPAS regulation, platforms, edge compute, cost</span>
+    </div>
+  </header>
+
+  <div class="tally">
+    <div>
+      <span class="n ok">14</span>
+      <small>Claims independently verified, including every price that could be checked</small>
+    </div>
+    <div>
+      <span class="n bad">4</span>
+      <small>Substantive errors, one of them a live compliance risk</small>
+    </div>
+    <div>
+      <span class="n gap">7</span>
+      <small>Gaps that leave the recommendation untestable as written</small>
+    </div>
+    <div>
+      <span class="n gap">100+</span>
+      <small>Broken <code>citeturn</code> markers — no claim is checkable by the reader</small>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">What changed</span>
+      <h2>Two rules landed. A third is pending.</h2>
+      <p>The window that made agricultural drones practical in Canada opened inside twelve months, which is also why anything written about it needs a review date.</p>
+    </div>
+
+    <div class="chrono">
+      <div class="chrono-row live">
+        <div class="chrono-date">4 Nov 2025</div>
+        <div class="chrono-body">
+          <h3>Level 1 Complex BVLOS created</h3>
+          <p>Final phase of <span class="mono">SOR/2025-70</span> in force. Defined lower-risk beyond-visual-line-of-sight operations, and extended Advanced privileges to medium drones, EVLOS and sheltered operations. BVLOS requires an RPAS Operator Certificate — an accountable executive, SOPs, a maintenance programme.</p>
+        </div>
+      </div>
+      <div class="chrono-row pending">
+        <div class="chrono-date">8 Jun 2026</div>
+        <div class="chrono-body">
+          <h3>NPA 2026-005 published</h3>
+          <p>Proposes mandatory Remote ID scaled by weight — FPV and model aircraft included — a community-organisation framework, and a new power to designate restricted drone airspace <strong>below 122&nbsp;m / 400&nbsp;ft</strong>.</p>
+        </div>
+      </div>
+      <div class="chrono-row live">
+        <div class="chrono-date">30 Jun 2026</div>
+        <div class="chrono-body">
+          <h3>Health Canada SPN2026-02</h3>
+          <p>A drone may apply any pesticide already registered for conventional aerial application, with no separate RPAS label amendment. Products that are not registered for aerial application, or that prohibit RPAS, remain off-limits.</p>
+        </div>
+      </div>
+      <div class="chrono-row pending">
+        <div class="chrono-date">9 Sep 2026</div>
+        <div class="chrono-body">
+          <h3>NPA 2026-005 comments closed</h3>
+          <p>Four days before the report was dated. There is no longer a consultation to monitor; the next event is a final rule.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Corrections</span>
+      <h2>The four errors</h2>
+      <p>Ordered by consequence. The first one can put an operator outside the label.</p>
+    </div>
+
+    <div class="stack">
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="chip">Compliance risk</span>
+          <h3>Spray buffer zones</h3>
+        </div>
+        <div class="swap">
+          <div>
+            <span class="k">Report said</span>
+            <span class="said">Follow &ldquo;the aerial label&rsquo;s application rate, spray volume, retreatment interval, buffer zones and other conditions.&rdquo;</span>
+          </div>
+          <div>
+            <span class="k">SPN2026-02 says</span>
+            <span class="fix">Apply the buffer zones established for conventionally piloted <em>rotary</em> aircraft — an interim precaution until RPAS-specific drift models exist.</span>
+          </div>
+        </div>
+        <p class="so-what"><b>Why it matters</b>Many aerial labels carry separate fixed-wing and rotary buffers. The rotary figure is the binding one and is usually the larger. An operator following the report&rsquo;s generic wording could apply the fixed-wing buffer and be both non-compliant and environmentally wrong.</p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="chip">Wrong date</span>
+          <h3>NPA 2026-005 timing</h3>
+        </div>
+        <div class="swap">
+          <div>
+            <span class="k">Report said</span>
+            <span class="said">Published August 2026; treat it as an open proposal.</span>
+          </div>
+          <div>
+            <span class="k">Actually</span>
+            <span class="fix">Published 8 June 2026. Comments closed 9 September 2026.</span>
+          </div>
+        </div>
+        <p class="so-what"><b>Why it matters</b>The action changes. Not &ldquo;monitor the consultation&rdquo; but &ldquo;assume Remote ID is coming, budget the retrofit, and do not design an airframe that cannot accept a broadcast module.&rdquo;</p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="chip">Scoped too narrowly</span>
+          <h3>The omitted airspace power</h3>
+        </div>
+        <div class="swap">
+          <div>
+            <span class="k">Report said</span>
+            <span class="said">NPA 2026-005 is a Remote ID proposal.</span>
+          </div>
+          <div>
+            <span class="k">Actually</span>
+            <span class="fix">It is three things. The third is a power to designate restricted RPAS airspace below 122&nbsp;m — the exact band every agricultural mission occupies.</span>
+          </div>
+        </div>
+        <p class="so-what"><b>Why it matters</b>A designated low-altitude restriction over or beside your fields would constrain operations regardless of certificate level. For anyone committing six figures, this is the most consequential pending change, and it is absent from the report entirely.</p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-head">
+          <span class="chip">Understated cost</span>
+          <h3>Level 1 Complex certification</h3>
+        </div>
+        <div class="swap">
+          <div>
+            <span class="k">Report said</span>
+            <span class="said">C$50.85 exam + C$125 issuance.</span>
+          </div>
+          <div>
+            <span class="k">Actually</span>
+            <span class="fix">Those fees are right, and they are the small part. Add the prerequisite Advanced exam, 20&nbsp;h of purchased ground school, and a flight review charged by the reviewer. Four figures per pilot.</span>
+          </div>
+        </div>
+        <p class="so-what"><b>Why it matters</b>The fee paragraph as written invites a reader to plan on C$176 for something that costs an order of magnitude more.</p>
+      </article>
+
+      <article class="finding gapnote">
+        <div class="finding-head">
+          <span class="chip caution">Gap</span>
+          <h3>Peak payload printed beside peak endurance</h3>
+        </div>
+        <p>The platform table gives the Matrice 400 &ldquo;up to 6&nbsp;kg&rdquo; and &ldquo;up to 59&nbsp;min&rdquo; in adjacent cells. Both figures are correct. They are also mutually exclusive.</p>
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr><th>Configuration</th><th>DJI&rsquo;s stated flight time</th><th>Planning use</th></tr></thead>
+            <tbody>
+              <tr><td>H30T only, ~10.67&nbsp;kg AUW</td><td class="num">59 min</td><td>The headline number</td></tr>
+              <tr><td>3&nbsp;kg payload</td><td class="num">44 min</td><td>Single sensor</td></tr>
+              <tr><td>6&nbsp;kg payload</td><td class="num hero">31 min</td><td>Loaded research config</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="so-what"><b>Why it matters</b>A reader sizing missions off the table plans roughly twice the endurance they will get. The report is careful about this for the M3M and the custom VTOL; it should be equally careful here.</p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Verified</span>
+      <h2>What held up</h2>
+      <p>Every figure that could be independently checked was right — which is the reason the report is worth correcting rather than discarding, and raises confidence in the quote-based ranges that cannot be checked.</p>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Claim</th><th>Checked against</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>M3M at C$6,000&ndash;6,500 in Canada</td><td>Volatus, DroneLabs listings</td><td class="num">C$6,033 / 6,245 / 6,529</td></tr>
+          <tr><td>Matrice 400: 6&nbsp;kg payload, 59&nbsp;min, 53&nbsp;min hover</td><td>DJI Enterprise specs</td><td>Exact</td></tr>
+          <tr><td>Trinity Pro: 90&nbsp;min, 5.75&nbsp;kg MTOW, PPK via iBase</td><td>Quantum Systems</td><td>Exact</td></tr>
+          <tr><td>Agras T50: 40&nbsp;kg spray / 50&nbsp;kg spread</td><td>Canadian dealers</td><td class="num">C$30,297 seen</td></tr>
+          <tr><td>Level 1 Complex fees</td><td>Transport Canada</td><td class="num">C$50.85 + C$125</td></tr>
+          <tr><td>AI HAT+&nbsp;2: 40 TOPS, 8&nbsp;GB, Hailo-10H</td><td>Raspberry Pi</td><td>Exact</td></tr>
+          <tr><td>Buy the 26-TOPS HAT, not the 40-TOPS HAT+&nbsp;2</td><td>Raspberry Pi&rsquo;s own guidance</td><td>Well judged</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:16px; font-size:.94rem; color:var(--muted); max-width:var(--measure)">On that last row: the newer 40-TOPS part delivers roughly comparable computer-vision throughput. Its advantage is local LLM and VLM work, which agricultural detection does not need. The report reached the right answer against the more impressive spec sheet.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">The recommendation, gated</span>
+      <h2>Buy the cheapest thing that answers the question</h2>
+      <p>The report&rsquo;s strongest call, and the one worth keeping: prove the imagery changes a management decision before buying anything that removes a bottleneck you have not yet measured. Stages 4, 5 and 6 solve three different bottlenecks and are independent — most programmes need at most one.</p>
+    </div>
+
+    <div class="ladder">
+      <div class="rung approved">
+        <div class="rung-n">01</div>
+        <div class="rung-main">
+          <h4>Prove the agronomy &mdash; DJI Mavic 3 Multispectral</h4>
+          <div class="rung-gate"><b>Gate to clear</b>Two or three decisions measurably changed by the imagery</div>
+        </div>
+        <div class="rung-cost">C$10k&ndash;16k</div>
+      </div>
+      <div class="rung approved">
+        <div class="rung-n">02</div>
+        <div class="rung-main">
+          <h4>Prove custom ML &mdash; Raspberry Pi 5 + AI HAT+ + Pixhawk</h4>
+          <div class="rung-gate"><b>Gate to clear</b>A model validated on your crops, not on public datasets</div>
+        </div>
+        <div class="rung-cost">C$4k&ndash;10k</div>
+      </div>
+      <div class="rung">
+        <div class="rung-n">03</div>
+        <div class="rung-main">
+          <h4>Remove the measured bottleneck &mdash; MicaSense, thermal, or Matrice 400</h4>
+          <div class="rung-gate"><b>Gate to clear</b>A specific analysis is demonstrably blocked by the M3M</div>
+        </div>
+        <div class="rung-cost">C$30k&ndash;65k</div>
+      </div>
+      <div class="rung">
+        <div class="rung-n">04</div>
+        <div class="rung-main">
+          <h4>Area coverage &mdash; Trinity Pro or WingtraRAY VTOL</h4>
+          <div class="rung-gate"><b>Gate to clear</b>A single survey no longer fits in one field visit</div>
+        </div>
+        <div class="rung-cost">C$40k&ndash;90k+</div>
+      </div>
+      <div class="rung">
+        <div class="rung-n">05</div>
+        <div class="rung-main">
+          <h4>BVLOS &mdash; Level 1 Complex certification and an RPOC</h4>
+          <div class="rung-gate"><b>Gate to clear</b>Crew relocation and VLOS repositioning is the binding constraint</div>
+        </div>
+        <div class="rung-cost">+C$10k&ndash;50k</div>
+      </div>
+      <div class="rung">
+        <div class="rung-n">06</div>
+        <div class="rung-main">
+          <h4>Spraying &mdash; Agras T50 class</h4>
+          <div class="rung-gate"><b>Gate to clear</b>Label eligibility, provincial certification and per-hectare economics all confirmed</div>
+        </div>
+        <div class="rung-cost">C$35k&ndash;65k</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">The missing instrument</span>
+      <h2>Where the VTOL crossover actually sits</h2>
+      <p>The report insists on an ROI gate and supplies no arithmetic to test it — no cost per hectare, no hectares per flight, no worked example. The tier structure rests on area efficiency, so here is the number it turns on.</p>
+    </div>
+
+    <figure>
+      <div class="chart-box">
+        <svg viewBox="0 0 580 210" role="img" aria-label="Area covered per flight: Mavic 3 Multispectral at 100 metres covers about 60 hectares, at 180 metres about 200 hectares, Trinity Pro VTOL about 700 hectares.">
+          <!-- gridlines -->
+          <line x1="196" y1="18" x2="196" y2="166" stroke="var(--rule)" stroke-width="1"/>
+          <line x1="379" y1="18" x2="379" y2="166" stroke="var(--rule)" stroke-width="1"/>
+          <line x1="562" y1="18" x2="562" y2="166" stroke="var(--rule)" stroke-width="1"/>
+
+          <!-- bars -->
+          <rect x="196" y="28" width="31" height="28" fill="var(--rule-firm)"/>
+          <text x="235" y="47" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" fill="var(--ink)">60 ha</text>
+          <text x="6" y="47" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">M3M @ 100 m AGL</text>
+
+          <rect x="196" y="76" width="105" height="28" fill="var(--rule-firm)"/>
+          <text x="309" y="95" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" fill="var(--ink)">200 ha</text>
+          <text x="6" y="95" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">M3M @ 180 m AGL</text>
+
+          <rect x="196" y="124" width="366" height="28" fill="var(--accent)"/>
+          <text x="552" y="143" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="600" fill="#FFFFFF">700 ha</text>
+          <text x="6" y="143" font-family="Archivo, sans-serif" font-size="12.5" font-weight="600" fill="var(--ink)">Trinity Pro VTOL</text>
+
+          <!-- axis -->
+          <line x1="196" y1="166" x2="562" y2="166" stroke="var(--rule-firm)" stroke-width="1"/>
+          <text x="196" y="184" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">0</text>
+          <text x="379" y="184" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">350</text>
+          <text x="562" y="184" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">700</text>
+          <text x="379" y="202" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.3" fill="var(--muted)">HECTARES PER FLIGHT</text>
+        </svg>
+      </div>
+      <figcaption>Trinity Pro figure is Quantum&rsquo;s stated 700&nbsp;ha, or a 100&nbsp;km corridor, per flight. M3M figures are typical mapping coverage at the stated altitude, and fall as required ground-sampling distance tightens.</figcaption>
+    </figure>
+
+    <div class="callout" style="margin-top:30px">
+      <h3>Two break-even calculations the report should have carried</h3>
+      <p><strong>Stage 1, on 2,000&nbsp;ha.</strong> C$12,000 of year-one capital over three years is C$4,000/yr. Flown five times a season, roughly <span class="mono">C$0.40 per hectare-pass</span> before labour. A 2% nitrogen-rate improvement on a C$120/ha nitrogen bill returns C$2.40/ha — about C$4,800/yr. One avoided blanket fungicide pass on 500&nbsp;ha at C$50/ha returns C$25,000. It pays back inside a season on plausible numbers; if it does not on yours, do not proceed to stage 3.</p>
+      <p><strong>Stage 6, custom spraying.</strong> At roughly C$45/ha billed less C$15/ha operating, margin is C$30/ha. Against C$45,000 year-one cost, break-even is about <span class="mono">1,500 ha in year one</span>. A drone sprayer wins on wet or soft ground, small and irregular parcels, steep sites, and late-canopy timing where a ground rig causes damage. It loses badly on open, dry, large broad-acre. If your acres are flat, dry and large, do not buy one.</p>
+      <p style="font-size:.9rem;color:var(--muted)">Illustrative. Replace every assumption with your own crop, area and input costs — that substitution is the point of the exercise.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Also missing</span>
+      <h2>Six capital scenarios, zero operating cost</h2>
+      <p>A first-year budget built from the report&rsquo;s tables will under-forecast, and it under-forecasts most on the spray scenario — the most expensive one.</p>
+    </div>
+    <ul class="plain">
+      <li><strong>Software renewal.</strong> The M3M bundle includes three months of DJI Terra and one year of SmartFarm. Year two is a fresh line item.</li>
+      <li><strong>Insurance.</strong> Not mentioned once in 375 lines. Commercial RPAS liability is effectively required at RPOC scale and is frequently demanded by landowners and clients.</li>
+      <li><strong>Batteries as consumables.</strong> Agras packs have a finite cycle life and are a leading annual cost, yet they are counted once, as capital.</li>
+      <li><strong>RPOC upkeep.</strong> Maintenance programme, document control, recurrent training every two years, accountable-executive time — for a thing the report itself says to treat as an aviation programme.</li>
+      <li><strong>Connectivity.</strong> LTE only where coverage justifies it; otherwise store-and-forward, which is a design decision, not an afterthought.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Architecture</span>
+      <h2>What runs where</h2>
+      <p>The report gets this split right, and the split is the most common way these systems fail. Edge first for flight-time decisions, workstation first for photogrammetry, cloud for scale.</p>
+    </div>
+    <div class="arch">
+      <div class="arch-row">
+        <div class="arch-where">Pixhawk / Cube<span>ArduPilot or PX4</span></div>
+        <div class="arch-what">Attitude stabilisation, navigation, geofence, lost-link, battery and return-to-home failsafes. Must survive the failure of everything else on this list.</div>
+      </div>
+      <div class="arch-row">
+        <div class="arch-where">Raspberry Pi 5<span>+ AI HAT+ 26 TOPS</span></div>
+        <div class="arch-what">Capture, image QA, detection, index summaries, telemetry fusion, store-and-forward spooling. Companion computer only — never the flight controller.</div>
+      </div>
+      <div class="arch-row">
+        <div class="arch-where">Field workstation<span>32&ndash;64 GB, discrete GPU</span></div>
+        <div class="arch-what">RTK/PPK quality checking, orthomosaics, dense point clouds, DSM/DTM, full multispectral mosaics. Never attempted on an airborne Pi.</div>
+      </div>
+      <div class="arch-row">
+        <div class="arch-where">Cloud<span>Object store + PostGIS</span></div>
+        <div class="arch-what">Multi-year field archives, cross-farm model training, satellite time series, dashboards.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Kept from the report</span>
+      <h2>Three rules worth enforcing in code</h2>
+      <p>These are the report&rsquo;s best judgements, and they are the kind that get quietly dropped during implementation. Each is testable, so each should be tested.</p>
+    </div>
+    <div class="rules">
+      <div class="rule-card">
+        <span class="mark">01 &middot; read-only MAVLink</span>
+        <h3>The Pi cannot command the aircraft</h3>
+        <p>The autopilot owns flight; the companion computer owns perception. The aircraft must fly its failsafes correctly with the Pi rebooted and the network gone — so the telemetry link exposes no method that could arm, change mode or upload a mission, and a test asserts none appears.</p>
+      </div>
+      <div class="rule-card">
+        <span class="mark">02 &middot; validated_locally</span>
+        <h3>A model is a sensor, not a decision</h3>
+        <p>DeepWeeds learned Australian species in Australian conditions; PlantVillage is single leaves on plain backgrounds, not aerial imagery. Neither is evidence about Saskatchewan canola. A false positive costs a walk across a field — or, wired to a sprayer, chemical, crop and an environmental incident.</p>
+      </div>
+      <div class="rule-card">
+        <span class="mark">03 &middot; DEGRADED, not deleted</span>
+        <h3>Failed QA flags data, it does not discard it</h3>
+        <p>A blurred frame over a real anomaly is still evidence that something is there. Deciding to throw data away belongs to an agronomist on the ground with context, not to a threshold on a Pi at 100&nbsp;m AGL.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Before anything is ordered</span>
+      <h2>Still unspecified</h2>
+    </div>
+    <p>Crop, average field size, province, connectivity, target ground-sampling distance, and whether the commercial value is stress detection, stand counting, weed mapping, water management, variable-rate prescription, documentation or spraying.</p>
+    <p style="margin-top:14px">Each of these can move the recommended system by a full tier. The report is right that mission architecture comes first and airframe second — which means the honest next step is not a purchase order but a decision about what question the imagery is being bought to answer.</p>
+  </section>
+
+  <footer>
+    <p style="color:var(--ink-2)"><strong>Currency.</strong> Regulatory content verified 13 September 2026 against Transport Canada and Health Canada publications. Three material changes landed in the preceding twelve months; re-verify before 31 March 2027. Prices are indicative Canadian planning figures before tax, not quotations. Not legal advice.</p>
+    <div class="src">
+      <a href="https://tc.canada.ca/en/aviation/drone-safety/2025-summary-changes-canada-drone-regulations">TC 2025 rule changes</a>
+      <a href="https://tc.canada.ca/en/aviation/drone-safety/drone-pilot-licensing/getting-drone-pilot-certificate">TC pilot certificates</a>
+      <a href="https://tc.canada.ca/en/aviation/drone-safety/summary-notice-proposed-amendment-npa-2026-005-information-sessions">NPA 2026-005</a>
+      <a href="https://www.canada.ca/en/health-canada/services/consumer-product-safety/reports-publications/pesticides-pest-management/policies-guidelines/science-policy-notes/2026/allowing-pesticide-application-remotely-piloted-aircraft-systems-rpas-drones-products-registered-aerial.html">SPN2026-02</a>
+      <a href="https://enterprise.dji.com/matrice-400/specs">DJI Matrice 400</a>
+      <a href="https://quantum-systems.com/trinity-pro/">Quantum Trinity Pro</a>
+      <a href="https://volatusdrones.ca/products/dji-mavic-3-multispectral">Volatus M3M</a>
+      <a href="https://www.raspberrypi.com/news/when-and-why-you-might-need-the-raspberry-pi-ai-hat-plus-2/">Raspberry Pi AI HAT+ 2</a>
+    </div>
+  </footer>
+
+</div>

@@ -1,0 +1,59 @@
+# agri-edge configuration
+#
+# Thresholds here decide what imagery survives a flight. Calibrate blur_threshold
+# on a known-sharp flight with your own sensor before trusting the default -- the
+# Laplacian variance scale is sensor- and scene-dependent, and a threshold that
+# never fires is worse than no check at all.
+
+site: example-farm
+field_id: north-quarter
+
+capture:
+  resolution: [4056, 3040]
+  interval_s: 2.0
+  output_dir: ./data/raw
+  # Refuse to capture if the autopilot has not reported a position this recently.
+  # An unlocatable frame cannot support cross-date comparison, which is the whole
+  # point of repeated monitoring.
+  max_telemetry_age_s: 2.0
+
+qa:
+  blur_threshold: 100.0
+  overexposed_fraction: 0.05
+  underexposed_fraction: 0.05
+  saturation_high: 250
+  saturation_low: 5
+
+  # 3 = 3D fix, 4 = DGPS, 5 = RTK float, 6 = RTK fixed
+  min_fix_type: 3
+  # Set true for plot research, prescription-map alignment or any temporal
+  # comparison. Leave false for general scouting.
+  require_rtk_fixed: false
+  max_hdop: 2.0
+  min_satellites: 8
+
+  # Every band listed here must be present or the frame fails QA.
+  # A missing red-edge band does not give you a worse NDRE; it gives you no NDRE.
+  required_bands: [red, green, nir, red-edge]
+
+inference:
+  enabled: false
+  # backend: simulated | onnx | hailo
+  backend: simulated
+  model_path: null
+  confidence_threshold: 0.5
+  input_size: [640, 640]
+  class_names: []
+
+spool:
+  spool_dir: ./data/spool
+  max_bytes: 68719476736   # 64 GB
+  # Leave null for offline store-and-forward. Rural Canadian connectivity should
+  # not be assumed; the realistic transfer mechanism is an SSD in a vehicle.
+  upload_endpoint: null
+
+mavlink:
+  # Read-only. See the safety contract in telemetry/mavlink_link.py.
+  connection: udpin:0.0.0.0:14550
+  source_system: 200
+  heartbeat_timeout_s: 5.0

@@ -1,0 +1,46 @@
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # The runtime targets Raspberry Pi OS Bookworm (Python 3.11) and is developed
+    # on 3.12. Both are tested so a 3.12-only idiom cannot reach the aircraft.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install the runtime core only
+        # Deliberately NOT the full dev extras. This step doubles as a check that
+        # the Pi runtime really does install with numpy and PyYAML alone -- if
+        # someone adds torch to the core dependencies, this is where it shows up,
+        # as a multi-minute install rather than a few seconds.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest
+
+      - name: Verify the dependency boundary
+        # Runs first and alone: if the runtime has grown a heavy dependency, that
+        # is the finding, and the rest of the suite is noise on top of it.
+        run: pytest tests/test_runtime_deps.py -q
+
+      - name: Run the suite
+        # Integration tests skip themselves when no exported model or dataset is
+        # present, which is the case on a clean runner.
+        run: pytest -q

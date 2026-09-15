@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agri-edge"
+version = "0.1.0"
+description = "Companion-computer edge pipeline for Canadian agricultural RPAS operations"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Hardware and heavy geospatial deps are optional so the pipeline runs, and the
+# tests pass, on a laptop with no camera, no autopilot and no GDAL.
+mavlink = ["pymavlink>=2.4"]
+camera = ["picamera2>=0.3"]
+cv = ["opencv-python-headless>=4.9"]
+geo = ["rasterio>=1.3"]
+onnx = ["onnxruntime>=1.17"]
+sensors = ["adafruit-circuitpython-bme280>=2.6"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+agri-edge = "agri_edge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

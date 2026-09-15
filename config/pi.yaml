@@ -1,0 +1,109 @@
+# agri-edge configuration for the Raspberry Pi 5 + AI HAT.
+#
+# Differs from example.yaml in three ways that matter:
+#   - inference is ON, pointing at a real model
+#   - bands are plain RGB (the Pi camera is not multispectral)
+#   - QA thresholds are looser, because a live camera at altitude is not a
+#     bench setup and an over-tight gate spools nothing
+
+site: field-trial
+field_id: plot-01
+
+capture:
+  # Camera Module 3 full resolution. Drop to (2028, 1520) for 2x2 binning if the
+  # Pi cannot keep up -- measure FPS first rather than guessing.
+  resolution: [4056, 3040]
+  interval_s: 1.0
+  output_dir: ./data/raw
+  max_telemetry_age_s: 2.0
+
+qa:
+  # CALIBRATE THIS BEFORE TRUSTING IT. Laplacian variance is sensor- and
+  # scene-dependent; 100 is a starting point from bench imagery, not a
+  # measurement of your camera at altitude. Fly a known-sharp pass, read the
+  # reported values out of the spool sidecars, and set the threshold below the
+  # 5th percentile of that distribution.
+  blur_threshold: 100.0
+
+  overexposed_fraction: 0.05
+  underexposed_fraction: 0.05
+  saturation_high: 250
+  saturation_low: 5
+
+  # 3 = 3D fix. Raise require_rtk_fixed for plot research or any cross-date
+  # comparison; leave it false for general scouting, where a metre of positional
+  # error does not change the agronomic conclusion.
+  min_fix_type: 3
+  require_rtk_fixed: false
+  max_hdop: 2.5
+  min_satellites: 6
+
+  # RGB camera: no multispectral bands to require. Listing bands that the sensor
+  # cannot produce fails every frame.
+  required_bands: []
+
+inference:
+  enabled: true
+
+  # backend: onnx   -> CPU, works everywhere, slower. Start here.
+  #          hailo  -> the AI HAT NPU. Needs a .hef from scripts/hailo_compile.sh
+  #                    and `sudo apt install hailo-all`.
+  backend: onnx
+  model_path: models/weed_crop_yolox_s.onnx
+
+  # 0.30 is a scouting threshold: it tolerates false positives because a human
+  # reviews the output. Raise it before anything downstream acts automatically.
+  confidence_threshold: 0.30
+
+  input_size: [640, 640]
+  class_names: [crop, weed]
+
+  # Report every detection under one label, keeping the model's own prediction in
+  # the sidecar as `source_label`. Leave null to report the model's classes.
+  #
+  # Set this to `weed` when running models/imageweeds_yolox_s.onnx: that model
+  # puts 76% of its predictions into one of its five species classes, but its
+  # boxes are right -- collapsing takes measured AP@.50 from 0.246 to 0.520.
+  # Claiming a species we cannot support is worse than saying "a weed", because
+  # the species is what picks the chemical. See models/imageweeds_yolox_s_CARD.md.
+  collapse_labels_to: null
+
+  # TILED INFERENCE -- for small targets this is not an optimisation, it is the
+  # difference between detectable and invisible.
+  #
+  # Letterboxing a 4056-wide frame to 640x640 discards 6.3x of linear resolution
+  # BEFORE the detector runs. A 3 cm weed seedling is then sub-pixel at any
+  # useful altitude. Tiling slices the frame at native resolution instead.
+  #
+  #   3 cm seedling    whole-frame: below 0.6 m AGL   tiled: below 3.9 m
+  #   25 cm weed       whole-frame: below 5.1 m       tiled: below 32 m
+  #   100 cm patch     whole-frame: below 20.5 m      tiled: below 130 m
+  #
+  # Run training/gsd_calculator.py for your camera and target size.
+  # Measured 2.3x more detections than whole-frame on real test imagery.
+  #
+  # Cost: one inference per tile. A 4056x3040 frame at tile 640 / overlap 0.2 is
+  # ~56 tiles. On the Pi CPU that is far too slow -- use the Hailo backend, or
+  # lower capture.resolution, before enabling this in flight.
+  tiled: false
+  tile_size: 640
+  tile_overlap: 0.2
+  max_tiles: 64
+
+spool:
+  spool_dir: ./data/spool
+  # Sized for a 128 GB card with headroom for the OS. The quota evicts uploaded
+  # payloads first, then QA-failed frames oldest-first, and never evicts an
+  # anomaly frame.
+  max_bytes: 68719476736   # 64 GB
+  upload_endpoint: null
+
+mavlink:
+  # Read-only. The Pi cannot command the aircraft -- see the safety contract in
+  # telemetry/mavlink_link.py.
+  #
+  # For a wired connection to a Pixhawk on the Pi's UART, use:
+  #   connection: /dev/serial0:921600
+  connection: udpin:0.0.0.0:14550
+  source_system: 200
+  heartbeat_timeout_s: 5.0

@@ -1,0 +1,20 @@
+{
+  "name": "weed_crop_yolox_s",
+  "version": "0.1.0",
+  "trained_on": [
+    "LibreYOLO/weed-crop-aerial (CC BY 4.0) -- credit Roboflow 100 / Roboflow Universe"
+  ],
+  "class_names": [
+    "crop",
+    "weed"
+  ],
+  "input_size": [
+    640,
+    640
+  ],
+  "architecture": "YOLOX-s (Apache-2.0, Megvii)",
+  "checkpoint": "YOLOX_outputs\\weed_crop_yolox_s\\best_ckpt.pth",
+  "decode": "raw head; decode + NMS on host via agri_edge.inference.yolox",
+  "validated_locally": false,
+  "validation_notes": "Trained on Roboflow-100 aerial imagery (Australian/US provenance, 95% weed / 5% crop class balance). NOT validated on Canadian field imagery. Decision support only."
+}

@@ -1,0 +1,410 @@
+<title>Weed Detector Build Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap">
+
+<style>
+  /* Instrument palette: warm slate neutrals, signal amber for findings,
+     instrument green for verified, signal red for failures. */
+  :root {
+    --ground:    #F5F4F1;
+    --surface:   #FFFFFF;
+    --surface-2: #EAE8E3;
+    --ink:       #1A1815;
+    --ink-2:     #45403A;
+    --muted:     #6B645B;
+    --rule:      #D9D5CE;
+    --rule-firm: #BAB4AA;
+
+    --accent:      #A85B06;
+    --accent-ink:  #8A4A05;
+    --accent-wash: #FBF0E0;
+
+    --ok:        #176B3A;
+    --ok-wash:   #E4F0E8;
+    --crit:      #A81E13;
+    --crit-wash: #FBEAE7;
+
+    --display: "IBM Plex Sans Condensed", "Helvetica Neue", Arial, sans-serif;
+    --body: "IBM Plex Sans", -apple-system, "Segoe UI", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #16150F;
+      --surface:   #1F1D17;
+      --surface-2: #2A271F;
+      --ink:       #F0EDE5;
+      --ink-2:     #CFC9BC;
+      --muted:     #968F82;
+      --rule:      #343026;
+      --rule-firm: #4A4538;
+
+      --accent:      #F0A742;
+      --accent-ink:  #F7BE68;
+      --accent-wash: #2E2314;
+
+      --ok:        #5FC183;
+      --ok-wash:   #16251B;
+      --crit:      #F0827A;
+      --crit-wash: #2C1815;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:    #16150F;
+    --surface:   #1F1D17;
+    --surface-2: #2A271F;
+    --ink:       #F0EDE5;
+    --ink-2:     #CFC9BC;
+    --muted:     #968F82;
+    --rule:      #343026;
+    --rule-firm: #4A4538;
+
+    --accent:      #F0A742;
+    --accent-ink:  #F7BE68;
+    --accent-wash: #2E2314;
+
+    --ok:        #5FC183;
+    --ok-wash:   #16251B;
+    --crit:      #F0827A;
+    --crit-wash: #2C1815;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 1.0rem;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 900px; margin-inline: auto; padding-inline: 20px; padding-block: 0 76px; }
+
+  h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.12; }
+  h1 { font-size: clamp(2rem, 5.5vw, 3.1rem); letter-spacing: -.015em; }
+  h2 { font-size: clamp(1.35rem, 3vw, 1.75rem); letter-spacing: -.01em; }
+  h3 { font-size: 1.05rem; font-family: var(--body); font-weight: 600; }
+  p { margin: 0; max-width: var(--measure); }
+  code, .mono { font-family: var(--mono); font-size: .87em; }
+  a { color: var(--accent-ink); text-underline-offset: 2px; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: .72rem; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+  }
+
+  header.mast {
+    padding-block: 54px 26px;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .lede { font-size: 1.16rem; line-height: 1.5; color: var(--ink-2); max-width: 60ch; }
+
+  /* status strip */
+  .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+            gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 30px; }
+  .status > div { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .status .v { font-family: var(--display); font-size: 1.75rem; font-weight: 700; line-height: 1;
+               font-variant-numeric: tabular-nums; }
+  .status .v.ok { color: var(--ok); }
+  .status .v.warn { color: var(--accent); }
+  .status small { font-size: .78rem; color: var(--muted); line-height: 1.35; }
+
+  section { margin-top: 58px; }
+  .sec-head { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .sec-head p { color: var(--ink-2); }
+
+  /* findings — a genuinely ranked list, so numbered */
+  .finding {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .finding.critical { border-left-color: var(--crit); }
+  .finding.good { border-left-color: var(--ok); }
+  .f-head { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+  .f-num { font-family: var(--mono); font-size: .95rem; font-weight: 600; color: var(--accent); }
+  .finding.critical .f-num { color: var(--crit); }
+  .finding.good .f-num { color: var(--ok); }
+  .f-head h3 { font-family: var(--display); font-size: 1.22rem; font-weight: 700; }
+  .punch { font-weight: 600; color: var(--ink); }
+
+  .tbl { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; min-width: 440px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th { font-family: var(--mono); font-size: .7rem; font-weight: 600; letter-spacing: .08em;
+             text-transform: uppercase; color: var(--muted); background: var(--surface-2);
+             border-bottom: 1px solid var(--rule-firm); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  td.n.bad { color: var(--crit); font-weight: 600; }
+  td.n.good { color: var(--ok); font-weight: 600; }
+
+  /* altitude bars */
+  .alt { display: flex; flex-direction: column; gap: 1px; background: var(--rule);
+         border: 1px solid var(--rule); }
+  .alt-row { background: var(--surface); padding: 14px 18px; display: grid;
+             grid-template-columns: 1fr; gap: 8px; }
+  @media (min-width: 700px) { .alt-row { grid-template-columns: 168px 1fr; gap: 20px; align-items: center; } }
+  .alt-label { font-weight: 600; font-size: .95rem; }
+  .alt-label span { display: block; font-family: var(--mono); font-size: .74rem; color: var(--muted); font-weight: 400; }
+  .bars { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .bar-line { display: flex; align-items: center; gap: 10px; }
+  .bar-track { flex: 1; height: 17px; background: var(--surface-2); position: relative; min-width: 60px; }
+  .bar-fill { height: 100%; }
+  .bar-fill.whole { background: var(--rule-firm); }
+  .bar-fill.tiled { background: var(--accent); }
+  .bar-val { font-family: var(--mono); font-size: .78rem; font-variant-numeric: tabular-nums;
+             white-space: nowrap; min-width: 62px; text-align: right; }
+  .bar-key { font-family: var(--mono); font-size: .68rem; color: var(--muted);
+             text-transform: uppercase; letter-spacing: .06em; min-width: 52px; }
+
+  .callout { border-top: 2px solid var(--accent); background: var(--surface);
+             padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
+  .callout.crit { border-top-color: var(--crit); }
+
+  ul.plain { margin: 0; padding-left: 1.15em; max-width: var(--measure);
+             display: flex; flex-direction: column; gap: 7px; }
+  ul.plain li { color: var(--ink-2); }
+
+  .steps { display: flex; flex-direction: column; gap: 1px; background: var(--rule);
+           border: 1px solid var(--rule); }
+  .step { background: var(--surface); padding: 15px 18px; display: grid;
+          grid-template-columns: 28px 1fr; gap: 14px; align-items: start; }
+  .step-n { font-family: var(--mono); font-weight: 600; color: var(--accent); font-size: .9rem; padding-top: 2px; }
+  .step-b { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .step-b strong { font-size: .98rem; }
+  .step-b span { font-size: .9rem; color: var(--muted); }
+  pre { margin: 0; overflow-x: auto; background: var(--surface-2); padding: 10px 12px;
+        font-family: var(--mono); font-size: .8rem; color: var(--ink-2); }
+
+  footer { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--rule);
+           font-size: .85rem; color: var(--muted); display: flex; flex-direction: column; gap: 8px; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <span class="eyebrow">agri-edge &middot; overnight build &middot; 13–14 Sept 2026</span>
+    <h1>The camera can't see what you're asking it to find</h1>
+    <p class="lede">The detector works. The pipeline works end to end. But opening the predictions instead of reading the mAP turned up something that changes which product you're building.</p>
+  </header>
+
+  <div class="status">
+    <div><span class="v ok">247</span><small>tests passing, no hardware needed</small></div>
+    <div><span class="v ok">0.75</span><small>weed AP@.50 on the held-out test split</small></div>
+    <div><span class="v warn">6</span><small>findings, three of them structural</small></div>
+    <div><span class="v ok">5</span><small>blocking bugs hit and fixed</small></div>
+  </div>
+
+  <section style="margin-top:44px">
+    <div class="sec-head">
+      <span class="eyebrow">Trained to convergence &middot; 100 epochs</span>
+      <h2>Final numbers</h2>
+      <p>Held-out test split, measured through the same <code>OnnxEngine</code> the Pi runs — so these describe the deployed path, letterbox and host-side decode included.</p>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Class</th><th style="text-align:right">AP@.50:.95</th><th style="text-align:right">AP@.50</th><th style="text-align:right">GT boxes</th></tr></thead>
+        <tbody>
+          <tr><td><strong>weed</strong></td><td class="n good">0.422</td><td class="n good">0.749</td><td class="n">696</td></tr>
+          <tr><td>crop <span style="color:var(--muted);font-size:.85em">— see finding 02</span></td><td class="n">0.363</td><td class="n">0.630</td><td class="n">85</td></tr>
+          <tr><td>overall</td><td class="n">0.392</td><td class="n">0.689</td><td class="n">781</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:12px;font-size:.9rem;color:var(--muted)">Best validation mAP 0.488. The curve stepped from 0.440 to 0.477 at epoch 85, exactly where mosaic and mixup augmentation switch off for the final stretch — the schedule did what it was designed to do.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Findings, ranked by consequence</span>
+      <h2>What turned up</h2>
+    </div>
+
+    <article class="finding critical">
+      <div class="f-head"><span class="f-num">01</span><h3>The dataset is not aerial</h3></div>
+      <p><code>LibreYOLO/weed-crop-aerial</code> sounds like drone imagery. It isn't. &ldquo;Aerial&rdquo; is a Roboflow-100 <em>domain-category</em> label, not a description of the photographs.</p>
+      <p class="punch">They are close-range ground-level shots, roughly 30–80&nbsp;cm above the soil — individual seedlings filling much of the frame.</p>
+      <p style="color:var(--muted);font-size:.93rem">Caught by opening the annotated predictions, not by reading a metric. Every aggregate number looked perfectly healthy.</p>
+    </article>
+
+    <article class="finding critical">
+      <div class="f-head"><span class="f-num">02</span><h3>The <code>crop</code> class was trained indoors, on plastic seed trays</h3></div>
+      <p>Following finding 01 further: splitting the dataset by filename and counting labels shows it is <span class="punch">three different visual domains, not one</span>.</p>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Sub-population</th><th style="text-align:right">Images</th><th style="text-align:right">crop</th><th style="text-align:right">weed</th></tr></thead>
+          <tbody>
+            <tr><td><code>3xxxx_</code> — outdoor, soil close-up</td><td class="n">883</td><td class="n bad">7</td><td class="n">5,926</td></tr>
+            <tr><td><code>IMG_*</code> — <strong>indoor propagation trays</strong></td><td class="n">241</td><td class="n good">403</td><td class="n">1,401</td></tr>
+            <tr><td>other — mixed ground-level</td><td class="n">52</td><td class="n">0</td><td class="n">115</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><span class="punch">98.3% of every <code>crop</code> label is in the indoor tray images</span> — visibly plastic seed trays, electrical cables, a plastic floor grate.</p>
+      <p>So the file contains two models: a weed detector trained outdoors, and a crop detector trained indoors. The <code>crop</code> AP of 0.363 is real, and it measures seedlings in trays. It says nothing about finding a crop in a field.</p>
+      <div class="callout crit" style="margin-top:6px">
+        <h3>What to do with this</h3>
+        <p>Use the <strong>weed</strong> class. Treat <strong>crop</strong> as unvalidated for any outdoor use until it is retrained on real field imagery.</p>
+      </div>
+    </article>
+
+    <article class="finding critical">
+      <div class="f-head"><span class="f-num">03</span><h3>Weed detection from survey altitude is an optics problem</h3></div>
+      <p>Letterboxing a 4056-wide camera frame down to the 640&times;640 network input <span class="punch">discards 6.3&times; of linear resolution before inference happens</span>. For small targets that is the whole game.</p>
+
+      <div class="alt">
+        <div class="alt-row">
+          <div class="alt-label">3 cm weed seedling<span>seedling stage</span></div>
+          <div class="bars">
+            <div class="bar-line"><span class="bar-key">whole</span><div class="bar-track"><div class="bar-fill whole" style="width:0.5%"></div></div><span class="bar-val">0.6 m</span></div>
+            <div class="bar-line"><span class="bar-key">tiled</span><div class="bar-track"><div class="bar-fill tiled" style="width:3%"></div></div><span class="bar-val">3.9 m</span></div>
+          </div>
+        </div>
+        <div class="alt-row">
+          <div class="alt-label">25 cm mature weed<span>established</span></div>
+          <div class="bars">
+            <div class="bar-line"><span class="bar-key">whole</span><div class="bar-track"><div class="bar-fill whole" style="width:3.9%"></div></div><span class="bar-val">5.1 m</span></div>
+            <div class="bar-line"><span class="bar-key">tiled</span><div class="bar-track"><div class="bar-fill tiled" style="width:24.6%"></div></div><span class="bar-val">32 m</span></div>
+          </div>
+        </div>
+        <div class="alt-row">
+          <div class="alt-label">100 cm weed patch<span>patch mapping</span></div>
+          <div class="bars">
+            <div class="bar-line"><span class="bar-key">whole</span><div class="bar-track"><div class="bar-fill whole" style="width:15.8%"></div></div><span class="bar-val">20.5 m</span></div>
+            <div class="bar-line"><span class="bar-key">tiled</span><div class="bar-track"><div class="bar-fill tiled" style="width:100%"></div></div><span class="bar-val">130 m</span></div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:.88rem;color:var(--muted);margin-top:4px">Maximum altitude at which the target still spans ~20&nbsp;px. Pi Camera Module 3. Bars share one scale, 0–130&nbsp;m.</p>
+
+      <p>At a normal 30&nbsp;m survey altitude a 3&nbsp;cm seedling is <span class="mono">2.6&nbsp;px</span> natively and <span class="mono">0.4&nbsp;px</span> after downscaling. No amount of training recovers that.</p>
+
+      <div class="callout crit" style="margin-top:6px">
+        <h3>The decision this forces</h3>
+        <p>Seedling-stage spot-spraying and patch-level mapping are <strong>different products</strong>, with different airframes and flight profiles. Pick one before buying hardware.</p>
+      </div>
+    </article>
+
+    <article class="finding good">
+      <div class="f-head"><span class="f-num">04</span><h3>Tiling recovers most of it — built and measured</h3></div>
+      <p>Slicing frames into native-resolution tiles instead of downscaling buys back the full 6.3&times;. Measured on a 1280&times;1280 mosaic of real test imagery:</p>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Method</th><th style="text-align:right">Detections</th></tr></thead>
+          <tbody>
+            <tr><td>Whole-frame (2&times; downscale)</td><td class="n bad">29</td></tr>
+            <tr><td><strong>Tiled</strong></td><td class="n good">66</td></tr>
+            <tr><td>Per-image native (reference)</td><td class="n">61</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><span class="punch">2.3&times; more detections</span>, matching the native reference. Costs one inference per tile — a full 4056&times;3040 frame is ~56 tiles, far too slow on the Pi CPU. That is an argument for the Hailo NPU.</p>
+    </article>
+
+    <article class="finding">
+      <div class="f-head"><span class="f-num">05</span><h3>Class balance is 95% weed / 5% crop</h3></div>
+      <p>The opposite of what I assumed when planning — only 278 <code>crop</code> boxes in training. A model that predicts <em>only</em> weed still posts a respectable aggregate mAP, so the evaluator leads with per-class AP.</p>
+      <p style="color:var(--muted);font-size:.93rem">I initially called <code>crop</code> &ldquo;effectively untrainable.&rdquo; By epoch 10 it reached AP 24.2 on validation, so that call was too pessimistic — the final test-split numbers get to settle it, not my earlier framing.</p>
+    </article>
+
+    <article class="finding">
+      <div class="f-head"><span class="f-num">06</span><h3>Your GPU is power-capped</h3></div>
+      <p><code>SW Power Cap: Active</code> — 217&nbsp;MHz of 3090&nbsp;MHz, P-state P4, on AC at 65&nbsp;°C, so not thermal. Throttled: 5.8&nbsp;s/iter. Unthrottled: <span class="punch">0.32&nbsp;s/iter — an 18&times; difference.</span></p>
+      <p>I deliberately left your power settings alone while you were asleep. Windows power mode &rarr; Best performance, Acer NitroSense &rarr; Performance, NVIDIA Control Panel &rarr; Prefer maximum performance.</p>
+    </article>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Fixed along the way</span>
+      <h2>Five things that blocked the build</h2>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Symptom</th><th>Actual cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Training died at epoch&nbsp;5</td>
+            <td>YOLOX JIT-compiles a C++ eval extension; its loader raises <code>RuntimeError</code> but the guard catches only <code>ImportError</code>. Ninja absent — and <code>cl.exe</code> absent too, so it could never have compiled</td>
+            <td>Made YOLOX take its own documented pycocotools fallback</td>
+          </tr>
+          <tr>
+            <td><code>torch.onnx._export</code> missing</td>
+            <td>YOLOX 0.3.0 uses a private API removed in torch&nbsp;2.x</td>
+            <td>Wrote our own exporter rather than patch vendored code</td>
+          </tr>
+          <tr>
+            <td>Sharp 5-band frames failed blur QA</td>
+            <td>Averaging bands before measuring suppressed high-frequency signal ~1/N</td>
+            <td>Measure per band, take the sharpest</td>
+          </tr>
+          <tr>
+            <td>Config crash on <code>null</code></td>
+            <td><code>Path(None)</code> on an optional path</td>
+            <td>Skip None; also reject unknown keys, since a typo'd threshold silently disables its check</td>
+          </tr>
+          <tr>
+            <td>Fragile cross-class method borrow</td>
+            <td>Hailo engine took a method off the ONNX engine's class body</td>
+            <td>Extracted a shared function so neither owns it</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Verification</span>
+      <h2>How the pipeline was checked</h2>
+      <p>Not &ldquo;it ran without error&rdquo; — each of these is an independent check against something that could disagree.</p>
+    </div>
+    <ul class="plain">
+      <li><strong>Decoder vs upstream.</strong> The numpy YOLOX decode matches YOLOX's own torch implementation to 1e-5 on random input, square and non-square.</li>
+      <li><strong>Known-answer image.</strong> The COCO model on <code>dog.jpg</code> returns bicycle 0.96 / dog 0.90 / truck 0.54 with pixel-tight boxes on a non-square frame — so the whole geometry path is right.</li>
+      <li><strong>Every annotation re-derived.</strong> All 7,852 boxes recomputed from their source labels through pycocotools. All round-trip.</li>
+      <li><strong>Full stack.</strong> Integration tests drive the real ONNX model through the real pipeline, asserting provenance, geometry, spool priority and the safety gate.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Tomorrow</span>
+      <h2>What to do next</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="step-n">01</span><div class="step-b"><strong>Fix the GPU power mode</strong><span>18&times; faster iteration. Everything else is gated on how fast you can retrain.</span></div></div>
+      <div class="step"><span class="step-n">02</span><div class="step-b"><strong>Install WSL2</strong><span>The Hailo compiler is x86_64 Linux only — not Windows, not the Pi.</span><pre>wsl --install -d Ubuntu-22.04</pre></div></div>
+      <div class="step"><span class="step-n">03</span><div class="step-b"><strong>Decide: seedlings at ~3 m, or patches at survey altitude?</strong><span>Finding 02. Everything downstream — airframe, camera, flight profile — depends on this answer.</span></div></div>
+      <div class="step"><span class="step-n">04</span><div class="step-b"><strong>Finalize the trained model</strong><span>Exports, evaluates on the held-out split, writes annotated predictions, benchmarks, fills in the model card.</span><pre>python training/finalize.py</pre></div></div>
+      <div class="step"><span class="step-n">05</span><div class="step-b"><strong>Look at the predictions</strong><span>Actually look. mAP hid the fact that the dataset wasn't aerial; one image caught it.</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="callout">
+      <h3>The thing that still isn't done</h3>
+      <p>All of the above is scaffolding. The model that matters is the one fine-tuned on imagery from the fields you actually intend to fly, at the altitude you intend to fly.</p>
+      <p>That is also the only point at which <code>validated_locally</code> may become true — the flag separating a scouting aid from something allowed to influence chemical application. It is enforced in code, all the way from the model file to every spooled frame.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Built overnight on <span class="mono">agri-edge</span>. Licensing stays Apache-2.0 throughout — YOLOX rather than Ultralytics YOLO, so nothing obliges you to open-source the product. Training data is CC&nbsp;BY&nbsp;4.0 and its attribution must survive into anything shipped.</p>
+    <p>Full detail in <span class="mono">docs/BUILD_NOTES.md</span>; model limits in <span class="mono">models/weed_crop_yolox_s_CARD.md</span>.</p>
+  </footer>
+
+</div>

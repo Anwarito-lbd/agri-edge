@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# Third-party source, cloned with gh. Kept out of the tree so upstream licences
+# stay distinct from ours -- see NOTICE.md.
+vendor/
+
+# Data and training artifacts (regenerate with training/download_data.py)
+data/
+runs/
+weights/
+YOLOX_outputs/
+YOLOX_outputs_crashed/
+
+# Model binaries. The .meta.json provenance sidecars ARE tracked: they are the
+# record of what a model was trained on and whether it was validated.
+models/*.onnx
+models/*.hef
+models/*.pth
