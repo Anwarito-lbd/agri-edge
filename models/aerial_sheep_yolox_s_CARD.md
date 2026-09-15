@@ -124,11 +124,15 @@ are CC BY 4.0 and their attribution **must** follow anything you ship.
 
 ## Results
 
-*Populated by `training/finalize.py --exp aerial_sheep_yolox_s`.*
+*Measured 2026-09-15 14:55 UTC on the held-out **test** split, via `training/evaluate.py`,
+running inference through the deployed `OnnxEngine`.*
+
+*Checkpoint: best_ckpt.pth (highest validation AP)*
 
 | Class | AP@.50:.95 | AP@.50 | GT boxes |
 |---|---:|---:|---:|
-| sheep | — | — | 5,603 |
+| sheep | 0.4664 | 0.9049 | 5603 |
+| **overall** | **0.4664** | **0.9049** | 5603 |
 
 Inference latency: run `python training/benchmark.py --model models/aerial_sheep_yolox_s.onnx`
 on the target device. Whole-frame, so expect roughly the un-tiled figures — and

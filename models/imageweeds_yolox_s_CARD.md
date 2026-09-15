@@ -54,51 +54,46 @@ naturally-occurring weeds that are **not** labelled. Two consequences:
 None of this is fixable by tuning. It is fixed by annotating your own field
 imagery, which is the phase-8 work regardless.
 
-**2. Species discrimination did not work, and this is now measured, not feared.**
-Across the 70-image test split the model emits 421 detections, and **76.2% of
-them are `horseweed`** — against horseweed being 14% of the ground truth:
+**2. Three of the five species work. Two do not. Use it accordingly.**
 
-| Class | GT boxes | Predicted |
-|---|---:|---:|
-| ragweed | 95 | 9 |
-| waterhemp | 52 | 5 |
-| horseweed | 44 | **321** |
-| redrootpigweed | 36 | 6 |
-| kochia | 79 | 80 |
+At epoch 75 this model had *collapsed*: 76.2% of its predictions were `horseweed`,
+against horseweed being 14% of ground truth. **Training to the full 150 epochs
+fixed that** — the largest class share is now 31.4%, and the prediction
+distribution roughly tracks reality:
 
-It has collapsed onto one class. Only kochia is predicted at a sane rate.
+| Class | GT boxes | Predicted (ep75) | Predicted (ep150) | AP@.50 |
+|---|---:|---:|---:|---:|
+| ragweed | 95 | 9 | 80 | **0.642** |
+| horseweed | 44 | 321 | 82 | **0.793** |
+| kochia | 79 | 80 | 89 | **0.624** |
+| redrootpigweed | 36 | 6 | 19 | 0.153 |
+| waterhemp | 52 | 5 | 13 | 0.073 |
 
-**But the boxes are right.** Scoring the identical model as a single-class
-detector — collapsing predictions *and* ground truth to `weed` — roughly doubles
-measured performance:
+**Horseweed, ragweed and kochia are usable. Redroot pigweed and waterhemp are
+not** — treat any detection carrying those two labels as "a weed", not as an
+identification. Both are the least-represented classes in training, so this is a
+data limit rather than a tuning one.
+
+**Binary mode still scores higher, and is still available:**
 
 | Mode | AP@.50:.95 | AP@.50 |
 |---|---:|---:|
-| 5-class species | 0.132 | 0.246 |
-| **Binary `weed`** | **0.247** | **0.520** |
-
-So this is a competent weed *localiser* wearing a species label it cannot
-support. **Ship it collapsed:**
-
-```yaml
-inference:
-  class_names: [ragweed, waterhemp, horseweed, redrootpigweed, kochia]
-  collapse_labels_to: weed
-```
-
-The predicted class is kept in each detection's `source_label`, so nothing is
-thrown away — the model stops *claiming* a species while still recording what it
-guessed. Reproduce with:
+| 5-class species | 0.259 | 0.457 |
+| Binary `weed` | 0.375 | **0.673** |
 
 ```bash
-python training/evaluate.py --model models/imageweeds_yolox_s.onnx     --root data/imageweeds --split test --collapse-to weed
+python training/evaluate.py --model models/imageweeds_yolox_s.onnx \
+    --root data/imageweeds --split test --collapse-to weed
 ```
 
-Note that 0.520 is still an **understatement**: unlabelled natural weeds in every
-frame are scored as false positives (see limitation 1).
+The aggregate favours binary, but species is what determines which chemical a
+farmer reaches for, so **the default is species mode** and the coarse label is
+opt-in via `inference.collapse_labels_to: weed`. Collapsing keeps the predicted
+class in each detection's `source_label`, so it changes what is *claimed* and
+never what was *observed*.
 
-Species ID remains the right product goal — species is what picks the chemical —
-but it needs locally annotated data, not tuning.
+Note that 0.673 is still an **understatement**: unlabelled natural weeds in every
+frame are scored as false positives (see limitation 1).
 
 **3. Small dataset.** 391 training images, 1,691 boxes across 5 classes — roughly
 340 examples per class. Heavy augmentation (mosaic, mixup, ±180° rotation, since
@@ -156,19 +151,19 @@ Also in `data/imageweeds/ATTRIBUTION.md` and [../NOTICE.md](../NOTICE.md).
 
 ## Results
 
-*Measured 2026-09-14 22:27 UTC on the held-out **test** split, via `training/evaluate.py`,
+*Measured 2026-09-15 15:22 UTC on the held-out **test** split, via `training/evaluate.py`,
 running inference through the deployed `OnnxEngine`.*
 
 *Checkpoint: best_ckpt.pth (highest validation AP)*
 
 | Class | AP@.50:.95 | AP@.50 | GT boxes |
 |---|---:|---:|---:|
-| ragweed | 0.0896 | 0.2105 | 95 |
-| waterhemp | 0.0080 | 0.0348 | 52 |
-| horseweed | 0.3024 | 0.5250 | 44 |
-| redrootpigweed | 0.0392 | 0.0764 | 36 |
-| kochia | 0.2189 | 0.3850 | 79 |
-| **overall** | **0.1316** | **0.2463** | 306 |
+| ragweed | 0.3460 | 0.6418 | 95 |
+| waterhemp | 0.0346 | 0.0726 | 52 |
+| horseweed | 0.4957 | 0.7926 | 44 |
+| redrootpigweed | 0.0672 | 0.1534 | 36 |
+| kochia | 0.3517 | 0.6245 | 79 |
+| **overall** | **0.2590** | **0.4570** | 306 |
 
 Inference latency: run `python training/benchmark.py --tiled --capture-width 4056`
 on the target device. Laptop CPU tiled measured 7.3 s/frame idle and 35.4 s/frame

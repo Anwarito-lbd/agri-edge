@@ -65,12 +65,18 @@ inference:
   # Report every detection under one label, keeping the model's own prediction in
   # the sidecar as `source_label`. Leave null to report the model's classes.
   #
-  # Set this to `weed` when running models/imageweeds_yolox_s.onnx: that model
-  # puts 76% of its predictions into one of its five species classes, but its
-  # boxes are right -- collapsing takes measured AP@.50 from 0.246 to 0.520.
-  # Claiming a species we cannot support is worse than saying "a weed", because
-  # the species is what picks the chemical. See models/imageweeds_yolox_s_CARD.md.
-  collapse_labels_to: weed
+  # Left null deliberately: the species model reports species.
+  #
+  # At epoch 75 this model had collapsed onto one class and collapsing to `weed`
+  # was the honest choice. Training to 150 epochs fixed it -- horseweed (0.793),
+  # ragweed (0.642) and kochia (0.624) are now usable, and species is what
+  # determines which chemical a farmer reaches for.
+  #
+  # Set this to `weed` if you would rather have the higher aggregate number
+  # (binary AP@.50 0.673 vs species 0.457) and no species claim at all. Note that
+  # redrootpigweed (0.153) and waterhemp (0.073) are NOT reliable either way --
+  # treat those two labels as "a weed". See models/imageweeds_yolox_s_CARD.md.
+  collapse_labels_to: null
 
   # TILED INFERENCE -- for small targets this is not an optimisation, it is the
   # difference between detectable and invisible.

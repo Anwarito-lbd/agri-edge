@@ -1,0 +1,19 @@
+{
+  "name": "aerial_sheep_yolox_s",
+  "version": "0.1.0",
+  "trained_on": [
+    "Aerial Sheep Dataset by Riis, via Roboflow Universe (Public Domain) -- mirrored as keremberke/aerial-sheep-object-detection"
+  ],
+  "class_names": [
+    "sheep"
+  ],
+  "input_size": [
+    640,
+    640
+  ],
+  "architecture": "YOLOX-s (Apache-2.0, Megvii)",
+  "checkpoint": "YOLOX_outputs\\aerial_sheep_yolox_s\\best_ckpt.pth",
+  "decode": "raw head; decode + NMS on host via agri_edge.inference.yolox",
+  "validated_locally": false,
+  "validation_notes": "Public Domain: no attribution obligation follows this model. Genuine nadir aerial imagery, splits verified free of augmentation leakage. Trained on sheep, which are the conservative case for cattle. NOT validated on Canadian field imagery. Decision support only."
+}
