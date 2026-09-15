@@ -235,11 +235,14 @@ inferences — 7.3 s on CPU (1.5 m/s ground speed, unflyable) vs ~288 ms on Hail
 ## Next steps
 
 ### Immediate (automated, running now)
-1. Species model finishes (~3 h throttled, ~40 min if power mode fixed), then
-   self-finalizes into `models/imageweeds_yolox_s_CARD.md`.
-2. Livestock training starts automatically when `runs/metrics_imageweeds_yolox_s.json`
-   appears, then self-finalizes.
-3. **Review `runs/predictions_*/` by eye.** mAP hid two dataset problems already.
+1. Livestock training resumed from epoch 35/60, then self-finalizes into
+   `models/aerial_sheep_yolox_s_CARD.md`.
+2. Species model then resumes 80 -> 150 and re-finalizes.
+   Both are chained in one script; **one run at a time, 8 GB VRAM fits exactly one.**
+3. ~~Review `runs/predictions_*/` by eye~~ — **done 15 Sept, and it paid for
+   itself twice**: it found the collapsed species head (above) and confirmed
+   model 1's test imagery contains a person's boot. Keep doing this after every
+   retrain. mAP has now hidden three separate problems.
 
 ### Blocked on the user
 4. Fix the GPU power mode — 18× on every retrain.
@@ -296,6 +299,12 @@ docs/USE_CASES.md    Roadmap: what's free, what's days, what's a separate produc
 docs/briefs/         Canadian RPAS regulation, procurement, compliance checklist
 models/*_CARD.md     Per-model limitations and measured results
 ```
+
+The current progress report, including the numbered airframe brief for the
+mechanical side, is checked in at
+[docs/progress-report-and-airframe-brief.html](docs/progress-report-and-airframe-brief.html)
+— open it in a browser. The published copy is convenient but the repo copy is
+the one that cannot disappear.
 
 Published reports (read-only, shareable):
 - Build report: https://claude.ai/code/artifact/ea614d7a-52db-4857-a18f-581e43f72640

@@ -1,0 +1,824 @@
+<title>Agri-Edge Field Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+  :root {
+    --ground:   #F2F3EF;
+    --surface:  #FBFCF9;
+    --panel:    #E9EBE3;
+    --ink:      #171A17;
+    --muted:    #5F665E;
+    --rule:     #D6DACE;
+    --rule-soft:#E4E7DE;
+    --accent:   #7A2E52;
+    --accent-soft: #F0E2E8;
+    --ok:       #3F6B45;
+    --warn:     #9A6A17;
+    --stop:     #8E3A24;
+    --bar-solid: #7A2E52;
+    --bar-ghost: #C9AFBB;
+
+    --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+    --measure: 66ch;
+    --gutter: clamp(18px, 4vw, 40px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #141712;
+      --surface:  #1B1F19;
+      --panel:    #21261E;
+      --ink:      #E9EBE4;
+      --muted:    #9CA497;
+      --rule:     #333A2F;
+      --rule-soft:#282E24;
+      --accent:   #CE7BA0;
+      --accent-soft: #33202A;
+      --ok:       #7FB283;
+      --warn:     #D2A04A;
+      --stop:     #D97F62;
+      --bar-solid: #CE7BA0;
+      --bar-ghost: #5B4150;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #141712;
+    --surface:  #1B1F19;
+    --panel:    #21261E;
+    --ink:      #E9EBE4;
+    --muted:    #9CA497;
+    --rule:     #333A2F;
+    --rule-soft:#282E24;
+    --accent:   #CE7BA0;
+    --accent-soft: #33202A;
+    --ok:       #7FB283;
+    --warn:     #D2A04A;
+    --stop:     #D97F62;
+    --bar-solid: #CE7BA0;
+    --bar-ghost: #5B4150;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding-inline: var(--gutter);
+    padding-block: clamp(28px, 6vw, 64px) 72px;
+  }
+
+  p, ul, ol { max-width: var(--measure); }
+  p { margin: 0 0 1.05em; }
+
+  h1, h2, h3, h4 {
+    font-family: var(--f-display);
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.16;
+    letter-spacing: -0.012em;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 20px; }
+  .kicker {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 { font-size: clamp(32px, 6.4vw, 50px); font-weight: 700; }
+  .standfirst {
+    font-size: clamp(17px, 2.3vw, 20px);
+    color: var(--muted);
+    margin-top: 14px;
+    max-width: 58ch;
+  }
+  .byline {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+  }
+
+  /* ---------- status strip ---------- */
+  .status {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin-top: 34px;
+  }
+  .stat { background: var(--surface); padding: 16px 18px; }
+  .stat .n {
+    font-family: var(--f-display);
+    font-weight: 700;
+    font-size: 27px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+  .stat .l {
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 5px;
+    display: block;
+  }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 58px; }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 9px;
+    margin-bottom: 26px;
+  }
+  .sec-head h2 { font-size: clamp(21px, 3vw, 27px); font-weight: 600; flex: 1; }
+  .sec-head .tag {
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 32px 0 10px;
+  }
+  h3:first-child { margin-top: 0; }
+
+  /* ---------- tables ---------- */
+  .tbl-scroll { overflow-x: auto; margin: 22px 0 26px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--f-mono);
+    font-size: 13px;
+    min-width: 440px;
+  }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-family: var(--f-body);
+    font-size: 14px;
+    color: var(--muted);
+    padding-top: 10px;
+    line-height: 1.5;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--ink);
+    padding: 0 12px 7px 0;
+    vertical-align: bottom;
+  }
+  td {
+    padding: 9px 12px 9px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  td:last-child, th:last-child { padding-right: 0; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: 1px solid var(--rule); }
+  .row-total td { font-weight: 600; border-top: 1px solid var(--rule); }
+
+  /* ---------- pills ---------- */
+  .pill {
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2.5px 7px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+    display: inline-block;
+  }
+  .p-ok { color: var(--ok); }
+  .p-run { color: var(--warn); }
+  .p-stop { color: var(--stop); }
+  .p-warn { color: var(--warn); }
+  .p-wait { color: var(--muted); }
+
+  /* ---------- callout ---------- */
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    margin: 26px 0;
+    max-width: var(--measure);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .lbl {
+    font-family: var(--f-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  /* ---------- chart ---------- */
+  figure { margin: 26px 0 30px; }
+  .chart-box { overflow-x: auto; }
+  figure svg { display: block; min-width: 520px; max-width: 100%; height: auto; }
+  figcaption {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 12px;
+    max-width: var(--measure);
+    line-height: 1.5;
+  }
+  .ct-label { font-family: "IBM Plex Mono", monospace; font-size: 12px; fill: var(--ink); }
+  .ct-axis  { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; fill: var(--muted); letter-spacing: 0.06em; }
+  .ct-val   { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; font-weight: 600; }
+
+  /* ---------- the airframe brief ---------- */
+  .brief {
+    background: var(--panel);
+    margin-top: 64px;
+    padding: clamp(24px, 5vw, 44px) 0;
+    border-block: 2px solid var(--ink);
+  }
+  .brief-inner { max-width: 880px; margin: 0 auto; padding-inline: var(--gutter); }
+  .brief h2 { font-size: clamp(24px, 4vw, 34px); font-weight: 700; }
+  .brief .addressed {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+
+  ol.tasks { list-style: none; padding: 0; margin: 34px 0 0; max-width: none; }
+  ol.tasks > li {
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    gap: 0 18px;
+    padding: 22px 0;
+    border-top: 1px solid var(--rule);
+  }
+  ol.tasks > li:last-child { border-bottom: 1px solid var(--rule); }
+  .t-num {
+    font-family: var(--f-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    padding-top: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-body { min-width: 0; }
+  .t-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 12px;
+    margin-bottom: 8px;
+  }
+  .t-head h3 { margin: 0; font-size: 18px; }
+  .t-body p { margin-bottom: 0.75em; max-width: 62ch; }
+  .t-body p:last-child { margin-bottom: 0; }
+  .spec {
+    font-family: var(--f-mono);
+    font-size: 12.5px;
+    line-height: 1.75;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 12px 14px;
+    margin: 12px 0 0;
+    max-width: 62ch;
+  }
+  .spec dt {
+    color: var(--muted);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .spec dd { margin: 0 0 9px; font-variant-numeric: tabular-nums; }
+  .spec dd:last-child { margin-bottom: 0; }
+  .because {
+    font-size: 14.5px;
+    color: var(--muted);
+    border-left: 2px solid var(--rule);
+    padding-left: 13px;
+    margin-top: 12px;
+    max-width: 60ch;
+  }
+
+  ul.plain { padding-left: 1.15em; }
+  ul.plain li { margin-bottom: 0.45em; }
+
+  code {
+    font-family: var(--f-mono);
+    font-size: 0.87em;
+    background: var(--accent-soft);
+    padding: 1.5px 5px;
+  }
+  strong { font-weight: 600; }
+  em.term { font-style: normal; font-family: var(--f-mono); font-size: 0.88em; }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, li:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .end {
+    margin-top: 64px;
+    padding-top: 18px;
+    border-top: 2px solid var(--ink);
+    font-family: var(--f-mono);
+    font-size: 12px;
+    color: var(--muted);
+    max-width: none;
+  }
+
+  @media (max-width: 520px) {
+    ol.tasks > li { grid-template-columns: 1fr; gap: 6px; }
+    .t-num { padding-top: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">Agri-Edge · Progress report · 15 September 2026</p>
+    <h1>Where the build stands, and what the airframe has to do next</h1>
+    <p class="standfirst">Three detectors trained, the edge pipeline complete and tested, and one finding that moves the hardest remaining constraint off the software and onto the aircraft.</p>
+    <div class="byline">
+      <span>Software side · report for both founders</span>
+      <span>Repo: <em class="term">agri-edge</em></span>
+      <span>Status: pre-hardware</span>
+    </div>
+  </header>
+
+  <div class="status">
+    <div class="stat"><span class="n">333</span><span class="l">Tests passing</span></div>
+    <div class="stat"><span class="n">8,753</span><span class="l">Lines of Python</span></div>
+    <div class="stat"><span class="n">2 + 1</span><span class="l">Models done / training</span></div>
+    <div class="stat"><span class="n">0</span><span class="l">Hardware in hand</span></div>
+  </div>
+
+  <section>
+    <div class="sec-head"><h2>The short version</h2><span class="tag">Summary</span></div>
+
+    <p>The whole software chain exists and is tested: a camera frame goes in, and what comes out is a quality-gated, georeferenced, provenance-stamped record with detections on it, queued for upload. None of it needs hardware to run — it runs today on the laptop against simulated frames and real test imagery.</p>
+
+    <p>Three detection models have been trained from scratch on real datasets. Two are finished, one is mid-run. All three are built on components we can legally ship in a commercial product, which cost us accuracy and was still the right call.</p>
+
+    <p>The most consequential thing learned is not a software result at all. <strong>Detecting weeds from survey altitude is limited by the camera's optics and the aircraft's motion, not by the model.</strong> That finding chose the product for us, and most of what remains on the critical path is now mechanical work.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>What is built</h2><span class="tag">Software · complete</span></div>
+
+    <p>Everything below runs on the Raspberry Pi and is covered by tests. The Pi runtime deliberately installs with only <code>numpy</code> and <code>PyYAML</code> — a test enforces that boundary, so nothing heavy can drift onto the aircraft by accident.</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr><th>Subsystem</th><th>What it does</th><th>State</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Capture</td><td>Pi Camera at 4056 × 3040, channel-order guard</td><td><span class="pill p-ok">Written</span></td></tr>
+          <tr><td>Quality gate</td><td>Blur, exposure, GNSS fix, satellites, tilt, band completeness</td><td><span class="pill p-ok">Tested</span></td></tr>
+          <tr><td>Detection</td><td>YOLOX decode, letterbox, NMS — pure numpy</td><td><span class="pill p-ok">Verified</span></td></tr>
+          <tr><td>Tiled inference</td><td>Native-resolution tiles instead of downscaling</td><td><span class="pill p-ok">Measured</span></td></tr>
+          <tr><td>Vegetation indices</td><td>NDVI, NDRE, GNDVI, SAVI, ExG + management zones</td><td><span class="pill p-ok">Tested</span></td></tr>
+          <tr><td>Environment</td><td>Temp / humidity / pressure → dew point, VPD, spray advisory</td><td><span class="pill p-ok">Tested</span></td></tr>
+          <tr><td>Telemetry</td><td>MAVLink, <strong>read-only by construction</strong></td><td><span class="pill p-ok">Asserted</span></td></tr>
+          <tr><td>Store &amp; forward</td><td>Priority spool, metadata-first upload, disk quota</td><td><span class="pill p-ok">Tested</span></td></tr>
+          <tr><td>Provenance</td><td>Every frame carries telemetry, QA result, model version, CRS</td><td><span class="pill p-ok">Tested</span></td></tr>
+          <tr><td>Hailo NPU backend</td><td>Needs a compiled model file and the board itself</td><td><span class="pill p-wait">Blocked</span></td></tr>
+        </tbody>
+      </table>
+      <caption>The detector maths was checked against the reference implementation to five decimal places rather than assumed correct — a silently wrong box decoder produces a model that trains beautifully and detects nothing.</caption>
+    </div>
+
+    <div class="note">
+      <span class="lbl">The safety gate, and why it is in the code rather than the manual</span>
+      <p>Every detection carries a flag, <em class="term">validated_locally</em>, which is <strong>false</strong> and stays false until a model has been checked against our own fields. While it is false, the detection reports <em class="term">may_drive_treatment = false</em> and every stored frame is stamped <em class="term">decision_support_only</em>.</p>
+      <p>That flag is the line between a scouting aid and something permitted to influence a chemical decision. It is enforced end to end and asserted by tests, so it cannot be forgotten in a hurry.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The three models</h2><span class="tag">Trained on real data</span></div>
+
+    <p>All three are YOLOX-s, chosen under a hard constraint: this is a product we intend to sell, so the popular YOLOv8 / v11 family is unusable — its licence would oblige us to publish our own source. YOLOX is Apache-2.0, and it is the only permissively-licensed detector with a documented path onto the Hailo accelerator. It costs a few points of accuracy. Keeping the option to ship closed-source is worth more.</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr><th>Model</th><th>Target</th><th class="num">Best result</th><th>State</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>weed_crop</td>
+            <td>Weed vs crop, seedling scale</td>
+            <td class="num">weed AP@.50 <strong>0.749</strong></td>
+            <td><span class="pill p-ok">Done</span></td>
+          </tr>
+          <tr>
+            <td>imageweeds</td>
+            <td>Five prairie weed species</td>
+            <td class="num">binary <strong>0.520</strong> · species 0.246</td>
+            <td><span class="pill p-ok">Usable</span></td>
+          </tr>
+          <tr>
+            <td>aerial_sheep</td>
+            <td>Livestock counting</td>
+            <td class="num">val mAP <strong>0.274</strong>, epoch 37/60</td>
+            <td><span class="pill p-run">Training</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <caption>The species model's headline number changed after we looked at what it was predicting rather than what it scored — see below.</caption>
+    </div>
+
+    <h3>What the datasets actually contained</h3>
+
+    <p>Three problems were caught by opening the images and looking at them, not by reading metrics. Each would have produced a confident, wrong product.</p>
+
+    <ul class="plain">
+      <li>The first dataset, labelled "aerial", <strong>is not aerial</strong>. "Aerial" was a catalogue category, not a description. The images are ground-level close-ups plus <strong>indoor propagation trays</strong> — and 98% of its <em class="term">crop</em> labels come from the trays. That model is a seedling detector photographed from a metre away. Its numbers must never be quoted as field performance.</li>
+      <li>The species dataset labels only the <strong>transplanted research specimens</strong> in pots. Every frame also contains dozens of natural weeds that are unlabelled, so they train as background. Measured precision therefore understates real performance, and recall is capped by the annotation rather than the model. No amount of tuning fixes this.</li>
+      <li>The livestock dataset was machine-augmented three times over. Had copies of one photograph landed on both sides of the train/test split, every number would have been inflated. It was checked: <strong>no source photograph appears in two splits.</strong></li>
+    </ul>
+
+    <p>A fourth was caught before it did damage: a quarter of the livestock images contain more than 50 animals, up to 105. The training defaults silently discard labels past 50 — which teaches the model that a plainly visible sheep is background. Nothing errors; the model just quietly learns to under-count. The limits were raised before the run started.</p>
+
+    <h3>The species model was mislabelled, not bad</h3>
+
+    <p>The five-species model scored a modest 0.246, which reads like a weak model. Opening its predictions told a different story: the boxes land squarely on real plants, well positioned — but <strong>76% of them say <em class="term">horseweed</em></strong>, a species that is only 14% of the ground truth.</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr><th>Species</th><th class="num">Actually present</th><th class="num">Model says</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ragweed</td><td class="num">95</td><td class="num">9</td></tr>
+          <tr><td>waterhemp</td><td class="num">52</td><td class="num">5</td></tr>
+          <tr><td>horseweed</td><td class="num">44</td><td class="num"><strong>321</strong></td></tr>
+          <tr><td>redroot pigweed</td><td class="num">36</td><td class="num">6</td></tr>
+          <tr><td>kochia</td><td class="num">79</td><td class="num">80</td></tr>
+        </tbody>
+      </table>
+      <caption>Boxes on the 70-image held-out test split. Only kochia is predicted at a sensible rate; the species head has collapsed onto one answer.</caption>
+    </div>
+
+    <p>So it is a competent weed <em>finder</em> wearing a species label it cannot support. Scoring the identical model as a plain weed detector — collapsing the predictions and the ground truth alike — roughly doubles it:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>Mode</th><th class="num">AP@.50:.95</th><th class="num">AP@.50</th></tr></thead>
+        <tbody>
+          <tr><td>Five species</td><td class="num">0.132</td><td class="num">0.246</td></tr>
+          <tr class="row-total"><td>Binary — just "weed"</td><td class="num">0.247</td><td class="num">0.520</td></tr>
+        </tbody>
+      </table>
+      <caption>And 0.520 still understates it: the unlabelled natural weeds in every frame are scored as false positives.</caption>
+    </div>
+
+    <div class="note">
+      <span class="lbl">What we changed, and the rule behind it</span>
+      <p>The runtime can now report a coarser label than the model predicted, keeping the predicted species in every record as <em class="term">source_label</em>. <strong>Collapsing changes what we claim, never what we observed.</strong> Seven tests hold that line, including one confirming it cannot be used to slip past the validation gate.</p>
+      <p>Species identification is still the right goal — the species is what picks the chemical. It needs imagery from our own fields, not more tuning.</p>
+    </div>
+
+    <p>This was found by opening the prediction images. The metric alone said "mediocre model"; the images said "good model, wrong label" — and those call for completely different responses.</p>
+
+    <div class="note">
+      <span class="lbl">What all three models have in common</span>
+      <p>They are trained on somebody else's fields, in one season, at one site. They are scaffolding that proves the pipeline works. <strong>They are not the product.</strong> The product starts when we fly our own fields and annotate what we see.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The finding that chose the product</h2><span class="tag">Optics</span></div>
+
+    <p>Before the detector runs, a 4056-pixel-wide frame is squeezed to a 640-pixel square. That throws away <strong>6.3× of linear resolution</strong> in one step. So the real question is never "is the model good enough" — it is whether the target survives that squeeze at all.</p>
+
+    <p>Working backwards from roughly 20 pixels across a target, which is about the floor for reliable detection, gives a hard ceiling in metres above ground for each thing we might want to see.</p>
+
+    <figure>
+      <div class="chart-box">
+        <svg viewBox="0 0 720 300" role="img" aria-label="Maximum detection altitude by target size: 3 cm seedling 0.6 m whole-frame and 3.9 m tiled; 30 cm mature weed 6.1 m and 39 m; 120 cm sheep 24.6 m and 155 m; 200 cm cow 41 m and 260 m.">
+          <!-- legend -->
+          <rect x="150" y="16" width="13" height="11" fill="var(--bar-solid)"></rect>
+          <text x="169" y="25.5" class="ct-axis">WHOLE-FRAME</text>
+          <rect x="268" y="16" width="13" height="11" fill="var(--bar-ghost)"></rect>
+          <text x="287" y="25.5" class="ct-axis">TILED (NATIVE RESOLUTION)</text>
+
+          <!-- gridlines -->
+          <line x1="224.5" y1="42" x2="224.5" y2="268" stroke="var(--rule)" stroke-width="1"></line>
+          <line x1="410.7" y1="42" x2="410.7" y2="268" stroke="var(--rule)" stroke-width="1"></line>
+          <line x1="596.9" y1="42" x2="596.9" y2="268" stroke="var(--rule)" stroke-width="1"></line>
+          <text x="224.5" y="284" class="ct-axis" text-anchor="middle">1 m</text>
+          <text x="410.7" y="284" class="ct-axis" text-anchor="middle">10 m</text>
+          <text x="596.9" y="284" class="ct-axis" text-anchor="middle">100 m</text>
+          <line x1="150" y1="268" x2="690" y2="268" stroke="var(--rule)" stroke-width="1"></line>
+
+          <!-- row 1: seedling -->
+          <text x="140" y="66" class="ct-label" text-anchor="end">3 cm seedling</text>
+          <rect x="150" y="53" width="184.5" height="18" fill="var(--bar-ghost)"></rect>
+          <rect x="150" y="53" width="33.2" height="18" fill="var(--bar-solid)"></rect>
+          <text x="342" y="66" class="ct-val" fill="var(--muted)">3.9 m</text>
+          <text x="191" y="66" class="ct-val" fill="var(--ink)">0.6</text>
+
+          <!-- row 2: mature weed -->
+          <text x="140" y="118" class="ct-label" text-anchor="end">30 cm mature weed</text>
+          <rect x="150" y="105" width="370.7" height="18" fill="var(--bar-ghost)"></rect>
+          <rect x="150" y="105" width="220.7" height="18" fill="var(--bar-solid)"></rect>
+          <text x="528" y="118" class="ct-val" fill="var(--muted)">39 m</text>
+          <text x="378" y="118" class="ct-val" fill="var(--ink)">6.1</text>
+
+          <!-- row 3: sheep -->
+          <text x="140" y="170" class="ct-label" text-anchor="end">120 cm sheep</text>
+          <rect x="150" y="157" width="482.3" height="18" fill="var(--bar-ghost)"></rect>
+          <rect x="150" y="157" width="333.5" height="18" fill="var(--bar-solid)"></rect>
+          <text x="640" y="170" class="ct-val" fill="var(--muted)">155 m</text>
+          <text x="491" y="170" class="ct-val" fill="var(--ink)">24.6</text>
+
+          <!-- row 4: cow -->
+          <text x="140" y="222" class="ct-label" text-anchor="end">200 cm cow</text>
+          <rect x="150" y="209" width="524.2" height="18" fill="var(--bar-ghost)"></rect>
+          <rect x="150" y="209" width="374.8" height="18" fill="var(--bar-solid)"></rect>
+          <text x="600" y="240" class="ct-val" fill="var(--muted)">260 m</text>
+          <text x="532" y="222" class="ct-val" fill="var(--ink)">41</text>
+        </svg>
+      </div>
+      <figcaption>Maximum altitude above ground at which a Pi Camera Module 3 can resolve each target. Logarithmic scale. Tiling means cutting the full frame into pieces at native resolution and running the detector on each piece — it recovers the 6.3× that downscaling throws away, at the cost of one inference per tile.</figcaption>
+    </figure>
+
+    <p>Two decisions follow directly from that picture.</p>
+
+    <p><strong>Seedlings are out.</strong> Even tiled, the ceiling is 3.9 m above ground. That is not a survey — it is a very nervous hover. We target <strong>mature weeds, identified by species</strong>, because the species is what determines which chemical a farmer reaches for, and because 39 m is a real flight.</p>
+
+    <p><strong>The AI accelerator is a requirement, not an upgrade.</strong> Tiling a full frame is 48 separate inferences. On the Pi's own processor that is about 7.3 seconds per frame, which caps ground speed at roughly 1.5 m/s. On the Hailo accelerator it is around 288 milliseconds. The board is what makes the mission flyable at all.</p>
+
+    <p><strong>Livestock is the exception, and it is nearly free.</strong> A cow is detectable at 41 m with no tiling and no accelerator — plain whole-frame detection on a bare Pi. Same pipeline, same architecture, vastly more forgiving optics. That is why it was added.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>New: the aircraft is now the binding constraint</h2><span class="tag">Flight envelope</span></div>
+
+    <p>Tiling solves the resolution problem, but it removes a cushion nobody was counting. When the whole frame is squeezed 6.3× before detection, six pixels of motion smear collapse into one blurry pixel and nobody notices. Tiling shows the detector the image at full scale — so <strong>it also shows it the blur at full scale</strong>.</p>
+
+    <p>The motion-blur budget is therefore 6.3× tighter than it looks, and it lands entirely on the airframe. At 30 m above ground, holding smear under one pixel:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr><th>Ground speed</th><th class="num">km/h</th><th class="num">Longest usable exposure</th><th>Practical read</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1 m/s</td><td class="num">3.6</td><td class="num">11.6 ms — 1/87 s</td><td>Easy in any light</td></tr>
+          <tr><td>3 m/s</td><td class="num">10.8</td><td class="num">3.9 ms — 1/260 s</td><td>Comfortable at midday</td></tr>
+          <tr><td>5 m/s</td><td class="num">18.0</td><td class="num">2.3 ms — 1/433 s</td><td>Needs bright sun</td></tr>
+          <tr><td>8 m/s</td><td class="num">28.8</td><td class="num">1.4 ms — 1/693 s</td><td>Gain climbs; noise costs detections</td></tr>
+          <tr><td>12 m/s</td><td class="num">43.2</td><td class="num">1.0 ms — 1/1039 s</td><td>Not realistic</td></tr>
+        </tbody>
+      </table>
+      <caption>Computed by <code>training/motion_budget.py</code>, added this session. Re-run it for any camera, altitude or target size before committing to a flight plan.</caption>
+    </div>
+
+    <h3>The rolling shutter, and being precise about what it breaks</h3>
+
+    <p>The Pi Camera reads its sensor one row at a time, taking roughly 33 milliseconds to work down the frame. The aircraft keeps moving during that sweep, so the top and bottom of a single photograph are taken from different places. The footprint on the ground is a parallelogram, not a rectangle.</p>
+
+    <p>It would be easy to conclude from this that we must fly at 1.7 m/s. That conclusion is wrong, and the distinction matters commercially:</p>
+
+    <ul class="plain">
+      <li><strong>Detection is unaffected.</strong> A single 30 cm weed spans about 26 rows out of 3040. Its own readout takes 0.28 ms, so at 5 m/s the weed itself is distorted by 0.12 of a pixel. Invisible. <strong>Finding things can fly fast.</strong></li>
+      <li><strong>Measurement and mapping are affected.</strong> Frame-level geometry is what skews — so georeferencing, area measurements, stitching and 3D reconstruction degrade, and they do it while the image still looks perfectly sharp. <strong>Mapping cannot fly fast</strong>, unless we use a global-shutter sensor, which has no sweep at all but costs about half the resolution.</li>
+    </ul>
+
+    <p>So it is a per-mission decision, not a single airframe specification — which is exactly why it has to be settled before the airframe is finalised. The cost is stark:</p>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr><th>Mission</th><th class="num">Speed</th><th class="num">Coverage</th><th class="num">Quarter-section (65 ha)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Scouting — detection only</td><td class="num">5 m/s</td><td class="num">67 ha/h</td><td class="num">0.96 h</td></tr>
+          <tr><td>Scouting — pushing it</td><td class="num">8 m/s</td><td class="num">108 ha/h</td><td class="num">0.60 h</td></tr>
+          <tr class="row-total"><td>Mapping-grade geometry</td><td class="num">1.7 m/s</td><td class="num">23 ha/h</td><td class="num">2.82 h</td></tr>
+        </tbody>
+      </table>
+      <caption>At 30 m above ground with 20% overlap between flight lines. Mapping-grade flight is roughly three times the airtime for the same field, which converts directly into batteries, and batteries into airframe mass.</caption>
+    </div>
+  </section>
+</div>
+
+<div class="brief">
+  <div class="brief-inner">
+    <p class="addressed">Addressed to the mechanical side</p>
+    <h2>The airframe brief</h2>
+    <p style="max-width: 62ch; margin-top: 16px;">Every item here comes out of something measured or enforced in the software, not from preference. Where a number appears, it is a number the code will check — several of these are tested automatically on every frame and will reject imagery that fails them. They are ordered so that each one unblocks the next.</p>
+
+    <ol class="tasks">
+
+      <li>
+        <span class="t-num">01</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Settle the mission before the airframe</h3><span class="pill p-stop">Blocks everything</span></div>
+          <p>Scouting and mapping are different aircraft. Mapping-grade geometry needs roughly three times the airtime for the same field, which changes battery count, which changes mass, which changes the whole design. Pick one to build first.</p>
+          <p class="because">Recommendation from this side: <strong>build for scouting.</strong> It is the mission the models actually support today, it flies three times faster, and mapping can be added later with a different camera on the same mount.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">02</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Lock a payload budget and weigh the real parts</h3></div>
+          <p>The compute payload is a Raspberry Pi 5, a Hailo AI HAT, an active cooler, the camera and its ribbon, an environmental sensor on a boom, a 5 V regulator and an enclosure. Estimated together at roughly 300–400 g — but that is an estimate, and the airframe should be sized against parts on a scale, not against this sentence.</p>
+          <p class="because">Stay decisively under 25 kg all-up. Above that line the Canadian regulatory category changes and the certification burden becomes a different project.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">03</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Camera mount: nadir, rigid, isolated</h3><span class="pill p-run">Code checks this</span></div>
+          <p>The lens looks straight down. The quality gate rejects any frame captured with the airframe tilted more than 10° from level, so a mount that lets the camera wander, or an aircraft that must pitch hard to make progress, throws away imagery in flight.</p>
+          <dl class="spec">
+            <dt>Pointing</dt><dd>Within 10° of nadir at capture — hard gate</dd>
+            <dt>Rigidity</dt><dd>No rotation relative to the flight controller; the telemetry attitude must describe the lens</dd>
+            <dt>Isolation</dt><dd>Damped from the frame, but not free to swing</dd>
+          </dl>
+          <p class="because">Tilt is one of the automated quality checks, alongside blur, exposure and GPS fix. A frame that fails is not deleted — it is stored and flagged — but it does not produce detections.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">04</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Vibration isolation, sized against the propellers</h3></div>
+          <p>A rolling-shutter sensor turns airframe vibration into wobble and shear across the frame rather than simple blur. The mount's own resonant frequency needs to sit well below the propeller blade-pass frequency, and well away from the motor and frame modes.</p>
+          <p>Blade-pass frequency is the propeller RPM divided by 60, multiplied by the number of blades. Compute it for the chosen motor and prop, and design the damping around that figure rather than a generic grommet choice.</p>
+          <p class="because">This is the single mechanical failure that most resembles a software bug: the imagery looks fine on a bench and degrades only in the air, only at certain throttle settings.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">05</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Thermal design for a Prairie summer, in sunlight</h3></div>
+          <p>The Pi 5 and the accelerator together run warm, and they will be sitting in a sealed box, in direct sun, over a field, in July. The Pi throttles its own clock speed when it gets hot — which does not produce an error message, only slower inference, which quietly lowers the maximum safe ground speed.</p>
+          <dl class="spec">
+            <dt>Needs</dt><dd>Active cooler plus ducted through-flow</dd>
+            <dt>Enclosure</dt><dd>Light-coloured; a dark box in direct sun is an oven</dd>
+            <dt>Airflow</dt><dd>Prop wash is available and free — use it deliberately</dd>
+          </dl>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">06</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Power: 5 V at 5 A, and a clean shutdown</h3><span class="pill p-stop">Data loss risk</span></div>
+          <p>The Pi 5 wants a genuine 5 A supply at 5 V. Undervolt it and it silently reduces the current available to the accelerator and camera; brown it out and the storage card corrupts — which in the field means losing a flight's imagery, not just a reboot.</p>
+          <dl class="spec">
+            <dt>Regulator</dt><dd>≥ 6 A continuous at 5.1 V, with bulk capacitance close to the board</dd>
+            <dt>Shutdown</dt><dd>The Pi must be told to shut down before flight power is cut</dd>
+            <dt>Wiring</dt><dd>Short, thick; measure voltage at the board under load, not at the regulator</dd>
+          </dl>
+          <p class="because">A hold-up capacitor or small backup supply that carries the Pi through an orderly shutdown is cheap insurance. Losing a day's flying to a corrupted card is the expensive version of this lesson.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">07</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Put the weather sensor where it can read the weather</h3></div>
+          <p>The environmental sensor feeds the spray-condition advisory — temperature, humidity and the derived vapour pressure deficit that says whether spray will evaporate or drift before it lands. The software is explicit that it measures <strong>ambient air at the airframe</strong>, so where it is mounted determines whether the reading means anything.</p>
+          <dl class="spec">
+            <dt>Away from</dt><dd>The Pi's exhaust, the motors, the battery</dd>
+            <dt>Shaded</dt><dd>Direct sun on the sensor adds several degrees of error</dd>
+            <dt>Ventilated</dt><dd>A sealed pod gives a humidity reading of the pod</dd>
+            <dt>Shape</dt><dd>Small radiation shield on a short boom</dd>
+          </dl>
+          <p class="because">This is also the ask that was reframed: <strong>a camera cannot measure soil moisture.</strong> That needs in-ground probes reporting by radio, with the drone providing the spatial pattern and the probes providing absolute truth. Worth building — but it is a ground product, not a payload.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">08</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Build a ground weather mast</h3><span class="pill p-warn">Legal requirement</span></div>
+          <p>Wind speed and direction must be recorded on every spray operation record. A drone cannot measure wind while sitting inside its own downwash, so this is a small mast at the field edge with an anemometer and a wind vane, logging alongside the flight.</p>
+          <p class="because">Roughly C$50–200 in parts and a few hours of work. It is currently the clearest gap between what we record and what the compliance checklist demands.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">09</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Landing gear, lens clearance, and a downward rangefinder</h3></div>
+          <p>The camera protrudes below the body. It needs ground clearance on landing, protection from stubble and debris, and nothing of the aircraft in the frame — no legs, no wires, no shadow of a boom at low sun.</p>
+          <p>A downward-facing rangefinder or laser altimeter is worth adding on the same plate. Height above the terrain, not above the takeoff point, is what fixes the ground resolution — and prairie fields are not flat. Same constraint applies: it must not see the landing gear.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">10</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Register the aircraft and mark it physically</h3></div>
+          <p>The registration number has to be displayed on the airframe itself. Worth solving as part of the build — a durable, legible marking on a surface that will not be swapped out during the first repair.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">11</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Bench-test vibration using our own quality metric</h3><span class="pill p-ok">Instrument exists</span></div>
+          <p>This is the best integration point between the two sides of the project, and it needs no extra equipment.</p>
+          <p>The quality gate already scores every frame for sharpness. Tie the airframe down, run the motors up through the throttle range with the camera capturing, and read the sharpness scores straight out of the stored frames. The throttle setting where the score falls off <strong>is</strong> the resonance, measured directly, before anything flies.</p>
+          <dl class="spec">
+            <dt>Command</dt><dd>agri-edge fly --bench</dd>
+            <dt>Read</dt><dd>blur score per frame, in each stored record</dd>
+            <dt>Sweep</dt><dd>Idle → hover → full, in steps, holding each</dd>
+          </dl>
+          <p class="because">Fly the same sweep after the first flight too, and set the blur threshold from the real distribution. The current threshold is a bench guess and is documented as one.</p>
+        </div>
+      </li>
+
+      <li>
+        <span class="t-num">12</span>
+        <div class="t-body">
+          <div class="t-head"><h3>Do not start the charging dock</h3><span class="pill p-wait">Deliberately deferred</span></div>
+          <p>An autonomous docking and charging station is genuinely your domain, and genuinely interesting: precision landing, weather sealing, contact charging or battery swap. The commercial equivalents cost around C$100,000.</p>
+          <p class="because">It is a company's worth of work on its own, and it multiplies the value of a product we do not have yet. Park it until something is earning.</p>
+        </div>
+      </li>
+
+    </ol>
+  </div>
+</div>
+
+<div class="wrap" style="padding-block: 56px 72px;">
+  <section style="margin-top:0;">
+    <div class="sec-head"><h2>What is blocking what</h2><span class="tag">Critical path</span></div>
+
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Owner</th><th>Why it matters</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Confirm what hardware physically exists</td><td>Both</td><td>Nothing on the hardware path can start until this is settled</td></tr>
+          <tr><td>Fix the laptop's GPU power mode</td><td>Software</td><td>Training currently runs 18× slower than the hardware allows</td></tr>
+          <tr><td>Install the Linux subsystem</td><td>Software</td><td>The accelerator's compiler runs nowhere else — not Windows, not the Pi</td></tr>
+          <tr><td>Verify the camera's colour channel order</td><td>Software</td><td>Swapped red and blue degrades detection subtly, not obviously</td></tr>
+          <tr><td>Airframe items 01–07</td><td>Mechanical</td><td>Determine what imagery we can produce at all</td></tr>
+          <tr><td>Fly our own fields and annotate</td><td>Both</td><td>The only path to a model that may influence a treatment decision</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <span class="lbl">The honest position</span>
+      <p>The software is further along than the hardware, and it is waiting. Everything trained so far is scaffolding built on other people's fields — useful for proving the pipeline, not for selling. The step that turns this from a demonstration into a product is flying our own crop and annotating what comes back, and that step cannot start until there is an aircraft to fly it on.</p>
+    </div>
+  </section>
+
+  <p class="end">
+    Agri-Edge · progress report, 15 September 2026 · Detector, pipeline and flight-envelope figures reproducible from the repository. Licensing ledger in NOTICE.md; per-model limitations in models/*_CARD.md; regulatory detail in docs/briefs/.
+  </p>
+</div>
