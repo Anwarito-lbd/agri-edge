@@ -49,6 +49,7 @@ def cmd_fly(args) -> int:
     # for, and a flag to switch it off would eventually be left on in flight.
     # Supplying synthetic telemetry keeps the gate intact and makes the fake
     # position obvious in every sidecar it touches.
+    #
     # --sitl is the mirror of --bench: SYNTHETIC camera, REAL telemetry. It is the
     # combination needed to test against ArduPilot SITL or workstation/
     # fake_autopilot.py, where there is a genuine MAVLink stream but no camera.
@@ -113,6 +114,40 @@ def cmd_spool(args) -> int:
         n = spool.export(Path(args.export))
         print(f"Exported {n} files to {args.export}")
         return 0
+
+    if args.upload and args.upload_to == "farmos":
+        from .store.farmos import FarmOSConfig, push_spool
+
+        if not cfg.farmos.url:
+            print(
+                "No farmos.url configured. Set it in the config file; the\n"
+                "credentials come from FARMOS_USERNAME / FARMOS_PASSWORD /\n"
+                "FARMOS_CLIENT_SECRET in the environment, never from the file.",
+                file=sys.stderr,
+            )
+            return 1
+
+        fcfg = FarmOSConfig.from_env(
+            cfg.farmos.url,
+            land_asset_id=cfg.farmos.land_asset_id,
+            timeout_s=cfg.farmos.timeout_s,
+        )
+        missing = fcfg.missing_credentials()
+        if missing:
+            print(
+                "farmOS credentials missing from the environment: "
+                + ", ".join(missing)
+                + "\nExport them and retry; they are deliberately not read from config.",
+                file=sys.stderr,
+            )
+            return 1
+
+        pending = len(spool.pending())
+        print(f"Pushing {pending} pending sidecars to farmOS at {cfg.farmos.url}")
+        print("  sidecars only -- images stay spooled for the workstation.")
+        result = push_spool(spool, fcfg, limit=args.limit_uploads)
+        print(json.dumps(result.as_dict(), indent=2))
+        return 0 if result.failed == 0 else 1
 
     if args.upload:
         from .store.uploader import build_uploader
@@ -280,6 +315,11 @@ def main(argv: list[str] | None = None) -> int:
     p_spool.add_argument("--export", metavar="DIR", help="Copy pending entries to DIR.")
     p_spool.add_argument("--upload", action="store_true",
                          help="Upload pending entries to spool.upload_endpoint.")
+    p_spool.add_argument(
+        "--upload-to", choices=["endpoint", "farmos"], default="endpoint",
+        help="Where --upload sends. 'farmos' creates observation logs in farmOS "
+             "(URL from config, credentials from the environment).",
+    )
     p_spool.add_argument("--upload-mode", choices=["metadata", "full"], default=None,
                          help="metadata = sidecars only (kB); full = also images (MB).")
     p_spool.add_argument("--limit-uploads", type=int, default=None, metavar="N",

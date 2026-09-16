@@ -146,6 +146,23 @@ class SpoolConfig:
 
 
 @dataclass
+class FarmOSSettings:
+    """Where the farm record system lives. Credentials are NOT here.
+
+    farmOS uses OAuth2, and this file is committed to git. The username,
+    password and client secret are read from the environment at run time by
+    `FarmOSConfig.from_env` -- a leaked client secret is not fixed by rotating
+    one key, so it must never enter the repository in the first place.
+    """
+
+    url: str | None = None
+    # farmOS land asset this site maps to. Optional: without it the observation
+    # logs are still created, just not attached to a field.
+    land_asset_id: str = ""
+    timeout_s: float = 20.0
+
+
+@dataclass
 class MavlinkConfig:
     # Read-only by design. See telemetry/mavlink_link.py.
     connection: str = "udpin:0.0.0.0:14550"
@@ -161,6 +178,7 @@ class Config:
     qa: QAConfig = field(default_factory=QAConfig)
     inference: InferenceConfig = field(default_factory=InferenceConfig)
     spool: SpoolConfig = field(default_factory=SpoolConfig)
+    farmos: FarmOSSettings = field(default_factory=FarmOSSettings)
     mavlink: MavlinkConfig = field(default_factory=MavlinkConfig)
 
     @classmethod
@@ -200,6 +218,7 @@ class Config:
             qa=sub(QAConfig, "qa"),
             inference=sub(InferenceConfig, "inference"),
             spool=sub(SpoolConfig, "spool"),
+            farmos=sub(FarmOSSettings, "farmos"),
             mavlink=sub(MavlinkConfig, "mavlink"),
         )
 

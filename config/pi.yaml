@@ -108,6 +108,25 @@ spool:
   max_bytes: 68719476736   # 64 GB
   upload_endpoint: null
 
+# Push flight observations into farmOS (https://farmos.org), a real farm record
+# system. Leave url null to skip it -- running offline is the normal case.
+#
+# NO CREDENTIALS HERE, DELIBERATELY. This file is committed to git. farmOS uses
+# OAuth2, and a leaked client secret is not fixed by rotating one key. The
+# username, password and client secret are read from the environment:
+#
+#   export FARMOS_USERNAME=... FARMOS_PASSWORD=... FARMOS_CLIENT_SECRET=...
+#   agri-edge -c config/pi.yaml spool --upload --upload-to farmos
+#
+# Only the sidecars travel, never the images: a flight is gigabytes of frames and
+# kilobytes of decisions, and the decisions are what a farm record needs.
+farmos:
+  url: null
+  # farmOS land asset this site maps to. Without it the logs are still created,
+  # just not attached to a field.
+  land_asset_id: ""
+  timeout_s: 20.0
+
 mavlink:
   # Read-only. The Pi cannot command the aircraft -- see the safety contract in
   # telemetry/mavlink_link.py.
