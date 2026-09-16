@@ -1,6 +1,6 @@
 # HANDOFF — agri-edge
 
-Last updated: 15 Sept 2026. For an agent or person picking this up with no prior
+Last updated: 15 Sept 2026 (evening). For an agent or person picking this up with no prior
 context. Read this, then [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md) for the
 reasoning behind the findings.
 
@@ -25,7 +25,7 @@ posture. See [NOTICE.md](NOTICE.md).
 
 ## Current progress
 
-**347 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
+**469 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
 
 ### Working
 
@@ -36,6 +36,11 @@ posture. See [NOTICE.md](NOTICE.md).
 | Tiled inference | Measured 2.3× more detections than whole-frame |
 | Label collapsing | Report a coarse label, keep the model's own class as `source_label` |
 | Model provenance | Derived per dataset; an unregistered dataset refuses to export |
+| Green-on-brown detection | Classical ExG thresholding, no model, no NPU (OpenWeedLocator, MIT) |
+| MAVLink fault injection | Real protocol via `workstation/fake_autopilot.py` |
+| Treatment geofence | Flight boundary vs treatment boundary, with buffer |
+| farmOS integration | Observation logs, stdlib only, credentials from the environment |
+| WebODM integration | Spool -> geotagged JPEG -> orthomosaic/DSM |
 | Store-and-forward uploader | Metadata-first, priority-ordered, stdlib only |
 | Environmental sensing (BME280) | Temp/humidity/pressure + dew point + VPD + spray advisory |
 | Read-only MAVLink telemetry | Safety contract enforced by test |
@@ -47,8 +52,12 @@ posture. See [NOTICE.md](NOTICE.md).
 | Model | Status | Result |
 |---|---|---|
 | `weed_crop_yolox_s` (binary, **seedlings**) | Done | weed AP@.50 **0.749**, crop 0.630 |
-| `imageweeds_yolox_s` (5 prairie **species**) | Finalized from epoch-75 ckpt; **resume to 150 queued** | species AP@.50 0.246; **binary `weed` 0.520** |
-| `aerial_sheep_yolox_s` (**livestock**) | **Training**, epoch 37/60 | val mAP 0.274 at ep19 |
+| `imageweeds_yolox_s` (5 prairie **species**) | Done, 150/150 | species AP@.50 **0.457**; binary `weed` 0.673 |
+| `aerial_sheep_yolox_s` (**livestock**) | Done, 60/60 | sheep AP@.50 **0.905** on 5,603 boxes |
+
+Per-species AP@.50: horseweed **0.793**, ragweed **0.642**, kochia **0.624** are
+usable; redrootpigweed 0.153 and waterhemp 0.073 are **not** — treat those two
+labels as "a weed", not an identification.
 
 Training is chained: each run finalizes itself (export → evaluate → predictions →
 benchmark → fill model card) via `training/finalize.py --exp <name>`.
@@ -70,32 +79,69 @@ benchmark → fill model card) via `training/finalize.py --exp <name>`.
 - **Chaining background work** (`until grep -q ...; do sleep; done; <next step>`)
   so training → finalize runs unattended.
 
-### The species head collapsed — and the fix was free
+### The species head collapsed at epoch 75 — and more training fixed it
 
-`imageweeds_yolox_s` puts **76.2% of its test predictions into `horseweed`**,
-which is 14% of ground truth (ragweed 95 GT → 9 predicted; waterhemp 52 → 5;
-redroot pigweed 36 → 6; kochia 79 → 80, the only sane one).
+At the epoch-75 checkpoint `imageweeds_yolox_s` put **76.2% of its predictions
+into `horseweed`**, against horseweed being 14% of ground truth. It had collapsed
+onto one class. **Training to the full 150 epochs fixed it**: the largest class
+share is now 31.4% and per-class AP@.50 roughly doubled.
 
-But its **boxes are right**. Scored as a single-class detector — collapsing
-predictions *and* ground truth — it roughly doubles:
+| Class | GT | pred @ep75 | pred @ep150 | AP@.50 |
+|---|---:|---:|---:|---:|
+| ragweed | 95 | 9 | 80 | 0.642 |
+| horseweed | 44 | 321 | 82 | 0.793 |
+| kochia | 79 | 80 | 89 | 0.624 |
+| redrootpigweed | 36 | 6 | 19 | 0.153 |
+| waterhemp | 52 | 5 | 13 | 0.073 |
 
-| Mode | AP@.50:.95 | AP@.50 |
-|---|---:|---:|
-| 5-class species | 0.132 | 0.246 |
-| **binary `weed`** | **0.247** | **0.520** |
+Binary still wins on aggregate (AP@.50 0.673 vs 0.457), so
+`inference.collapse_labels_to` stays and is one line to enable — but species is
+what picks the chemical, so **species is the default**. Collapsing keeps the
+predicted class in `source_label`, so it changes what is **claimed**, never what
+was **observed**; seven tests pin that down, including that it cannot launder the
+`validated_locally` gate.
 
-And 0.520 still *understates* it, because unlabelled natural weeds score as false
-positives. So `inference.collapse_labels_to: weed` was added: it reports the
-coarse label while keeping the predicted class in `source_label`, so collapsing
-changes what is **claimed**, never what was **observed**. Seven tests pin that
-down, including that it cannot launder the `validated_locally` gate.
+Two lessons, and the second is the bigger one:
+
+1. **This was found by opening the prediction images, not by reading mAP.** The
+   aggregate said "weak model"; the images said "good localiser, wrong label".
+2. **A collapsed head can be a symptom of undertraining, not a dataset limit.**
+   The binary-collapse workaround was the right call on the evidence available at
+   epoch 75 and the wrong permanent conclusion. Finish the training run before
+   deciding what a model fundamentally cannot do.
 
 Reproduce: `python training/evaluate.py --model models/imageweeds_yolox_s.onnx
 --root data/imageweeds --split test --collapse-to weed`
 
-**This was found by opening the prediction images, not by reading mAP.** The
-aggregate number looked like a weak model; it was actually a good localiser
-wearing a label it could not support.
+---
+
+## The five integrated projects (15 Sept)
+
+All cloned into gitignored `vendor/`. **No GitHub forks**, and no GPL or AGPL
+code is linked into this tree.
+
+| Project | Licence | How it is used |
+|---|---|---|
+| **OpenWeedLocator** | **MIT** | Code ported into `inference/greenonbrown.py` |
+| **AgOpenGPS** | **Apache-2.0** | Reference for `geo/geofence.py` section geometry |
+| ArduPilot | GPL-3.0 | Separate process/hardware, MAVLink protocol boundary |
+| WebODM | **AGPL-3.0** | Unmodified Docker service, HTTP boundary |
+| farmOS | GPL-2.0 | Unmodified Docker service, HTTP boundary |
+
+Only the two permissive ones have code brought in. The rest are separate
+programs behind documented protocols — which is what keeps the closed-source
+posture intact. See NOTICE.md for the AGPL network clause in particular.
+
+**This machine cannot run three of them.** No compiler, no WSL, no Docker. So:
+
+- ArduPilot SITL cannot be built here. `scripts/sitl.sh` refuses early with the
+  reason rather than failing halfway through a build.
+- WebODM and farmOS cannot be started here, so their clients are tested against
+  local stubs. That verifies our requests, **not** that those servers accept
+  them. Point each at a real instance before trusting it.
+- `workstation/fake_autopilot.py` fills the SITL gap for the telemetry path
+  only: it speaks genuine MAVLink so it tests our decoder against the real
+  protocol, but it has no flight dynamics, no EKF and no failsafes.
 
 ---
 
@@ -152,10 +198,21 @@ wearing a label it could not support.
 11. **Only one training run at a time.** 8 GB VRAM fits exactly one YOLOX-s run
    (~7.1 GB). Queue on a finalize artifact (`runs/metrics_<exp>.json`), not on a
    log string.
-12. **Don't run the full test suite while training.** `cv2.resize` in
+12. **Newline escapes inside a heredoc-embedded Python string corrupt the file.**
+   Writing a backslash-n through `python - <<'PYEOF'` produced a *literal*
+   newline inside the string literal four separate times, each one an
+   unterminated-string SyntaxError — including once while writing this very
+   entry. **Use the Edit tool for any text containing escape sequences**, and
+   keep heredoc-driven edits to plain substitutions.
+13. **A stale UDP sender makes a fault test pass spuriously.** A previous
+   `fake_autopilot` run was still alive and sending healthy packets on the same
+   port, so an injected GNSS-loss test saw a mix of both streams and two frames
+   "passed" that should not have. It looked exactly like a QA bug in
+   `check_gnss`. Every test in `test_mavlink_faults.py` now takes its own port.
+14. **Don't run the full test suite while training.** `cv2.resize` in
    `test_yolox_postprocess.py` flaked once under memory pressure. Not a code bug.
    (Re-run on 15 Sept during training: 333 passed, no flakes.)
-13. **`export_onnx.py` hardcoded `trained_on`, so every sidecar was wrong.**
+15. **`export_onnx.py` hardcoded `trained_on`, so every sidecar was wrong.**
    All three models claimed `weed-crop-aerial` -- including the stock COCO model
    and the species model, which owes CC BY credit to a *different* paper (Rai et
    al. 2023). A wrong CC BY credit is a compliance failure, not untidiness.
@@ -163,13 +220,13 @@ wearing a label it could not support.
    **raises** rather than defaulting (`DATASET_PROVENANCE`), because a
    confidently wrong attribution is worse than a missing one.
    `tests/test_provenance.py` holds it.
-14. **An abrupt kill looks nothing like a crash.** On 15 Sept the livestock run
+16. **An abrupt kill looks nothing like a crash.** On 15 Sept the livestock run
    was found dead at epoch 35/60 with **no error in the log** — the log's tail was
    nulls and `last_epoch_ckpt.pth` was a truncated 108 KB. That is the signature
    of the process being killed mid-write (session restart), not a CUDA fault.
    `latest_ckpt.pth` was intact, so `train_resilient.py` resumed at a cost of one
    epoch. **Check the log tail for nulls before hunting for an exception.**
-15. **`nvidia-smi` clock readings are unreliable on this laptop.** It reported
+17. **`nvidia-smi` clock readings are unreliable on this laptop.** It reported
    22–44 MHz of 3090 with *no throttle reason active*, while YOLOX logged
    2.5 s/iter; an hour later, same reported clock (217 MHz), 0.264 s/iter — near
    full speed. **Trust `iter_time` in the training log, not the clock query.**
@@ -292,6 +349,8 @@ training/          Laptop only — never ships to the aircraft
   finalize.py      export + evaluate + predict + benchmark, one command
   gsd_calculator.py  Can the camera resolve target X at altitude Y?
   motion_budget.py   How fast can it fly before blur/skew ruins the frame?
+workstation/       Laptop only -- fake_autopilot.py (MAVLink + faults),
+                   webodm_submit.py (spool -> geotagged JPEG -> orthomosaic)
 scripts/           pi_setup.sh (on the Pi), hailo_compile.sh (in WSL2)
 config/            example.yaml (bench), pi.yaml (deployment)
 docs/BUILD_NOTES.md  Findings and reasoning — read this second
