@@ -15,6 +15,32 @@ import yaml
 
 
 @dataclass
+class CameraGeometry:
+    """The lens, so a detection's pixels can become a place on the ground.
+
+    Defaults are the Pi Camera Module 3 (IMX708). Change them for a different
+    camera -- these come off a datasheet, and a wrong focal length scales every
+    ground position by a constant factor, which looks like a GNSS offset.
+
+    `yaw_offset_deg` is the camera's rotation on the airframe, clockwise from
+    "top of image points at the nose". A camera bolted on sideways needs 90 here,
+    and getting it wrong rotates an entire flight.
+
+    `terrain_uncertainty_m` feeds the reported per-detection error budget: how
+    far the real ground may sit from the flat plane the projection assumes.
+    """
+
+    sensor_width_mm: float = 7.4
+    focal_length_mm: float = 4.74
+    yaw_offset_deg: float = 0.0
+    terrain_uncertainty_m: float = 2.0
+    # Off. Georeferencing needs a real AGL altitude and a real heading; on a
+    # bench with neither, every position would be fiction. Turn it on when the
+    # aircraft supplies both.
+    enabled: bool = False
+
+
+@dataclass
 class QAConfig:
     """Thresholds for edge image quality assessment.
 
@@ -97,8 +123,13 @@ class InferenceConfig:
     #
     # `class_names` supplies the label; keep it [vegetation] unless you are
     # deliberately asserting that green means weed on this ground.
-    # `confidence_threshold` applies, but note confidence here is index strength
-    # rather than a probability.
+    # `confidence_threshold` applies -- and MIND THE SCALE. For a YOLOX model it
+    # is a probability, where 0.30 is a permissive scouting threshold. Here it is
+    # index strength, (mean_index - green_index_min) / (green_index_max -
+    # green_index_min), and typical field vegetation lands around 0.10-0.20. So
+    # the 0.30 that is permissive for a model silently discards EVERYTHING here.
+    # Set it explicitly when switching backends; the two numbers are not
+    # comparable and sharing one field is the trap.
     green_index: str = "exg"              # exg | exgr | nexg | maxg
     green_threshold_mode: str = "absolute"  # absolute (explainable) | adaptive (OWL's)
     green_index_min: float = 30.0
@@ -175,6 +206,7 @@ class Config:
     site: str = "unnamed-site"
     field_id: str = "unnamed-field"
     capture: CaptureConfig = field(default_factory=CaptureConfig)
+    camera_geometry: CameraGeometry = field(default_factory=CameraGeometry)
     qa: QAConfig = field(default_factory=QAConfig)
     inference: InferenceConfig = field(default_factory=InferenceConfig)
     spool: SpoolConfig = field(default_factory=SpoolConfig)
@@ -215,6 +247,7 @@ class Config:
             site=raw.get("site", "unnamed-site"),
             field_id=raw.get("field_id", "unnamed-field"),
             capture=sub(CaptureConfig, "capture"),
+            camera_geometry=sub(CameraGeometry, "camera_geometry"),
             qa=sub(QAConfig, "qa"),
             inference=sub(InferenceConfig, "inference"),
             spool=sub(SpoolConfig, "spool"),

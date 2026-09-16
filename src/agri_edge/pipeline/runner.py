@@ -131,7 +131,38 @@ class Pipeline:
         dets = self.engine.infer(frame.image)
         keep = [d for d in dets if d.confidence >= self.cfg.inference.confidence_threshold]
         self.stats.detections += len(keep)
+        self._georeference(keep, frame)
         return keep
+
+    def _georeference(self, detections: list, frame: Frame) -> None:
+        """Give each detection a place on the ground, when we honestly can.
+
+        Off by default and skipped without telemetry: a position derived from a
+        missing altitude or an unknown heading is fiction, and fiction with seven
+        decimal places is worse than an empty field.
+        """
+        geom = self.cfg.camera_geometry
+        if not geom.enabled or not detections:
+            return
+        from ..geo.georeference import CameraIntrinsics, CameraMount, georeference_detections
+
+        h, w = frame.image.shape[:2]
+        intrinsics = CameraIntrinsics(
+            sensor_width_mm=geom.sensor_width_mm,
+            focal_length_mm=geom.focal_length_mm,
+            # The ACTUAL frame size, not the configured one. Binning or a cropped
+            # sensor mode changes the pixel count, and a stale value would scale
+            # every position.
+            image_width_px=w,
+            image_height_px=h,
+        )
+        georeference_detections(
+            detections,
+            intrinsics,
+            frame.telemetry,
+            mount=CameraMount(yaw_offset_deg=geom.yaw_offset_deg),
+            terrain_uncertainty_m=geom.terrain_uncertainty_m,
+        )
 
     def _index_summaries(self, frame: Frame) -> dict:
         """Compute whichever vegetation indices this payload supports.

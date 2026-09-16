@@ -46,6 +46,20 @@ class Detection:
     # this is what the network said. None when no collapsing happened.
     source_label: str | None = None
 
+    # Where on the ground this detection is, filled in by
+    # `geo.georeference.georeference_detections` when telemetry and camera
+    # intrinsics are both available. None means it was NOT georeferenced -- never
+    # a default or a guess, because a fabricated position is worse than none.
+    # `geo_error` says why, when there is a reason worth recording.
+    lat: float | None = None
+    lon: float | None = None
+    position_error_m: float | None = None
+    geo_error: str | None = None
+
+    @property
+    def has_position(self) -> bool:
+        return self.lat is not None and self.lon is not None
+
     @property
     def may_drive_treatment(self) -> bool:
         """Whether this detection is permitted to generate a treatment prescription.
@@ -65,6 +79,13 @@ class Detection:
         }
         if self.source_label is not None:
             out["source_label"] = self.source_label
+        if self.has_position:
+            out["lat"] = round(float(self.lat), 7)     # ~1 cm, finer than any GNSS here
+            out["lon"] = round(float(self.lon), 7)
+            if self.position_error_m is not None:
+                out["position_error_m"] = self.position_error_m
+        elif self.geo_error is not None:
+            out["geo_error"] = self.geo_error
         return out
 
 

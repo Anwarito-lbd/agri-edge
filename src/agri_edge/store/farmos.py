@@ -136,6 +136,7 @@ def sidecar_to_log(meta: dict, land_asset_id: str = "") -> dict:
     for d in dets:
         counts[d.get("label", "unknown")] = counts.get(d.get("label", "unknown"), 0) + 1
 
+    placed = [d for d in dets if d.get("lat") is not None and d.get("lon") is not None]
     may_treat = any(d.get("may_drive_treatment") for d in dets)
     summary = ", ".join(f"{n} x {lab}" for lab, n in sorted(counts.items())) or "no detections"
 
@@ -154,6 +155,14 @@ def sidecar_to_log(meta: dict, land_asset_id: str = "") -> dict:
     qa = meta.get("qa", {}) or {}
     if qa.get("passed") is False:
         notes.append("QA: FAILED - this frame is flagged degraded, not discarded.")
+    if placed:
+        worst = max(d.get("position_error_m") or 0.0 for d in placed)
+        notes.append(
+            f"Positions: {len(placed)} of {len(dets)} detections georeferenced, "
+            f"worst-case +/- {worst:.1f} m from the flat-ground assumption."
+        )
+    elif dets:
+        notes.append("Positions: none -- this log locates the AIRCRAFT, not the findings.")
 
     attributes: dict[str, Any] = {
         "name": f"Aerial scouting: {summary}",
@@ -168,13 +177,29 @@ def sidecar_to_log(meta: dict, land_asset_id: str = "") -> dict:
                 "may_drive_treatment": may_treat,
                 "model": model,
                 "qa_passed": qa.get("passed"),
+                "georeferenced": len(placed),
+                # Worst-case positional uncertainty across the placed detections,
+                # so the record says how well it knows where these things are.
+                "position_error_m": (
+                    max(d.get("position_error_m") or 0.0 for d in placed) if placed else None
+                ),
             }
         ),
     }
+    # Geometry: prefer where the WEEDS are over where the AIRCRAFT was.
+    #
+    # The aircraft's position answers "where was the drone", which is nearly
+    # useless agronomically. Once detections are georeferenced they answer "where
+    # is the kochia", which is the thing a farmer acts on. Fall back to the frame
+    # position only when no detection has one.
+    #
+    # farmOS geometry is WKT, and longitude comes FIRST: POINT(x y) is
+    # POINT(lon lat). Backwards puts every Prairie observation in Somalia.
     lat, lon = telem.get("lat"), telem.get("lon")
-    if lat is not None and lon is not None:
-        # farmOS geometry is WKT. Longitude first: POINT(x y) is POINT(lon lat),
-        # and getting it backwards puts every Prairie observation in Somalia.
+    if placed:
+        points = ", ".join(f"({d['lon']} {d['lat']})" for d in placed)
+        attributes["geometry"] = {"value": f"MULTIPOINT({points})"}
+    elif lat is not None and lon is not None:
         attributes["geometry"] = {"value": f"POINT({lon} {lat})"}
 
     payload: dict[str, Any] = {

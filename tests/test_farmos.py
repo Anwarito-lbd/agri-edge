@@ -234,3 +234,56 @@ class TestAgainstStub:
         result = push_spool(spool, _cfg("http://127.0.0.1:1"))
         assert result.created == 0
         assert any("authentication failed" in e for e in result.errors)
+
+
+class TestGeoreferencedDetections:
+    """Once detections have positions, the log should locate the weeds.
+
+    Before georeferencing existed, a farmOS log could only say where the
+    *aircraft* was — which is nearly useless agronomically. "There is kochia
+    here" is the thing a farmer acts on.
+    """
+
+    @staticmethod
+    def _meta(placed=2, unplaced=1):
+        dets = []
+        for i in range(placed):
+            dets.append({
+                "label": "kochia", "may_drive_treatment": False,
+                "lat": 49.8953 + i * 1e-4, "lon": -97.1386,
+                "position_error_m": 1.9 - i,
+            })
+        for _ in range(unplaced):
+            dets.append({"label": "ragweed", "may_drive_treatment": False})
+        m = json.loads(json.dumps(SIDECAR))
+        m["detections"] = dets
+        return m
+
+    def test_geometry_is_the_detections_not_the_aircraft(self):
+        geom = sidecar_to_log(self._meta())["data"]["attributes"]["geometry"]["value"]
+        assert geom.startswith("MULTIPOINT")
+        assert "49.8953" in geom
+        assert "49.8951" not in geom, "aircraft position must not be used when weeds are placed"
+
+    def test_multipoint_is_longitude_first(self):
+        geom = sidecar_to_log(self._meta(placed=1, unplaced=0))["data"]["attributes"]["geometry"]
+        assert geom["value"] == "MULTIPOINT((-97.1386 49.8953))"
+
+    def test_falls_back_to_the_frame_position_when_nothing_is_placed(self):
+        geom = sidecar_to_log(self._meta(placed=0, unplaced=3))["data"]["attributes"]["geometry"]
+        assert geom["value"] == "POINT(-97.1384 49.8951)"
+
+    def test_notes_say_how_many_were_placed_and_how_well(self):
+        notes = sidecar_to_log(self._meta())["data"]["attributes"]["notes"]["value"]
+        assert "2 of 3 detections georeferenced" in notes
+        assert "+/- 1.9 m" in notes
+
+    def test_notes_are_explicit_when_nothing_is_placed(self):
+        """Otherwise a reader assumes the point marks the finding."""
+        notes = sidecar_to_log(self._meta(placed=0, unplaced=2))["data"]["attributes"]["notes"]
+        assert "locates the AIRCRAFT, not the findings" in notes["value"]
+
+    def test_worst_case_error_is_reported_not_the_average(self):
+        data = json.loads(sidecar_to_log(self._meta())["data"]["attributes"]["data"])
+        assert data["position_error_m"] == 1.9
+        assert data["georeferenced"] == 2
