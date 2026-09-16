@@ -42,6 +42,18 @@ class EnvironmentReading:
     pressure_hpa: float | None = None
     sensor: str = "none"
 
+    # WIND. Not measured by the BME280 and not measurable from the aircraft at
+    # all -- a drone sits in its own downwash, so an anemometer bolted to the
+    # airframe reads the rotors, not the weather. It has to come from a mast at
+    # the field edge or a handheld meter. See airframe brief item 08.
+    #
+    # `wind_source` records which, because a reading whose provenance is unknown
+    # cannot support a spray record.
+    wind_speed_ms: float | None = None
+    wind_direction_deg: float | None = None      # degrees FROM which it blows
+    wind_source: str = "none"                    # none | mast | handheld | forecast
+    wind_measured_at: float | None = None
+
     @property
     def valid(self) -> bool:
         return self.temperature_c is not None and self.humidity_pct is not None
@@ -79,19 +91,75 @@ class EnvironmentReading:
         avp = svp * (max(0.0, min(100.0, self.humidity_pct)) / 100.0)
         return round(svp - avp, 4)
 
-    def spray_advisory(self) -> tuple[str, str]:
+    # Wind thresholds in m/s. Standard agricultural spray guidance is expressed
+    # in km/h (3-15 ideal), converted here because everything else in this
+    # codebase is SI.
+    WIND_CALM_MS = 0.83      #  3 km/h -- BELOW this is dangerous, see below
+    WIND_GOOD_MAX_MS = 4.17  # 15 km/h
+    WIND_CAUTION_MAX_MS = 5.56  # 20 km/h
+    WIND_MAX_AGE_S = 1800.0  # 30 min
+
+    def spray_advisory(self, now: float | None = None) -> tuple[str, str]:
         """A coarse spray-condition read. Returns `(level, reason)`.
 
         Deliberately coarse, and deliberately advisory. Thresholds vary by product
         and jurisdiction, and the **product label is authoritative** -- this
         flags conditions worth a second look, it does not authorise or forbid an
         application.
+
+        **Wind is checked first, and its absence blocks an "ok".** Wind is the
+        dominant drift factor: this advisory once returned "ok" in a 40 km/h
+        crosswind because it only looked at temperature and humidity. Canadian
+        spray records are also required to carry wind speed and direction, so a
+        reading without it cannot support one regardless of how pleasant the
+        temperature is.
+
+        The counterintuitive part is the LOW end. Dead calm is not ideal, it is
+        dangerous: still air below about 3 km/h usually means a temperature
+        inversion, where fine droplets hang in a stable layer and then move off
+        target as a concentrated cloud when it breaks -- often hundreds of metres,
+        long after the operator has packed up. Every agricultural extension
+        service warns about this and it is the condition an inexperienced
+        operator is most likely to think is perfect.
         """
         if not self.valid:
             return ("unknown", "no environmental reading")
 
         t, rh = self.temperature_c, self.humidity_pct
         vpd = self.vapour_pressure_deficit_kpa or 0.0
+
+        # --- wind first: it dominates drift, and its absence is disqualifying ---
+        w = self.wind_speed_ms
+        if w is None or self.wind_source in ("none", ""):
+            return (
+                "unknown",
+                "no wind measurement -- wind dominates drift and is required on a "
+                "spray record. Fit a ground mast or enter a handheld reading; an "
+                "anemometer on the aircraft measures its own downwash.",
+            )
+        if self.wind_source == "airframe":
+            return (
+                "unknown",
+                "wind reported from the airframe, which sits in its own downwash. "
+                "That number describes the rotors, not the weather.",
+            )
+        age = (now if now is not None else time.time()) - (self.wind_measured_at or 0.0)
+        if self.wind_measured_at is not None and age > self.WIND_MAX_AGE_S:
+            return ("unknown", f"wind reading is {age / 60:.0f} min old -- stale for spraying")
+        if self.wind_direction_deg is None:
+            return ("unknown", "wind speed without direction -- a spray record needs both")
+
+        kmh = w * 3.6
+        if w < self.WIND_CALM_MS:
+            return (
+                "poor",
+                f"{kmh:.0f} km/h -- too calm. Still air suggests a temperature "
+                "inversion; fine droplets will hang and move off target later.",
+            )
+        if w > self.WIND_CAUTION_MAX_MS:
+            return ("poor", f"{kmh:.0f} km/h -- too windy, unacceptable drift")
+        if w > self.WIND_GOOD_MAX_MS:
+            return ("caution", f"{kmh:.0f} km/h -- near the upper wind limit")
 
         if t is not None and t > 30:
             return ("poor", f"{t:.0f} C -- high temperature increases evaporation and drift")
@@ -103,7 +171,11 @@ class EnvironmentReading:
             return ("caution", f"VPD {vpd:.2f} kPa -- very humid; slow drying, runoff risk")
         if t is not None and t < 5:
             return ("caution", f"{t:.0f} C -- low temperature slows uptake")
-        return ("ok", f"{t:.0f} C, {rh:.0f}% RH, VPD {vpd:.2f} kPa")
+        return (
+            "ok",
+            f"{kmh:.0f} km/h from {self.wind_direction_deg:.0f} deg, "
+            f"{t:.0f} C, {rh:.0f}% RH, VPD {vpd:.2f} kPa",
+        )
 
     def to_dict(self) -> dict:
         return {
@@ -114,7 +186,11 @@ class EnvironmentReading:
             "pressure_hpa": self.pressure_hpa,
             "dew_point_c": round(self.dew_point_c, 2) if self.dew_point_c is not None else None,
             "vapour_pressure_deficit_kpa": self.vapour_pressure_deficit_kpa,
+            "wind_speed_ms": self.wind_speed_ms,
+            "wind_direction_deg": self.wind_direction_deg,
+            "wind_source": self.wind_source,
             "spray_advisory": self.spray_advisory()[0],
+            "spray_advisory_reason": self.spray_advisory()[1],
             # Air, not soil. Stated in the record so nobody later mistakes it.
             "measures": "ambient air at the airframe; NOT soil moisture",
         }

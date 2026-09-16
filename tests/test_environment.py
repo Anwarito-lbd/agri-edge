@@ -81,34 +81,126 @@ class TestVapourPressureDeficit:
         assert EnvironmentReading().vapour_pressure_deficit_kpa is None
 
 
+def reading(temp=20.0, rh=65.0, wind=2.5, direction=270.0, source="mast", at=None):
+    """A reading with GOOD wind by default, so temperature tests isolate temperature.
+
+    Wind is supplied everywhere because without it the advisory correctly refuses
+    to give a verdict at all -- see TestWindIsRequired.
+    """
+    import time as _t
+
+    return EnvironmentReading(
+        temperature_c=temp, humidity_pct=rh,
+        wind_speed_ms=wind, wind_direction_deg=direction,
+        wind_source=source, wind_measured_at=at if at is not None else _t.time(),
+    )
+
+
+class TestWindIsRequired:
+    """The bug this class exists for: the advisory used to read only temperature
+    and humidity, so it would cheerfully return "ok" in a 40 km/h crosswind."""
+
+    def test_no_wind_means_no_verdict(self):
+        level, why = EnvironmentReading(temperature_c=20.0, humidity_pct=65.0).spray_advisory()
+        assert level == "unknown"
+        assert "wind" in why
+
+    def test_perfect_temperature_cannot_override_missing_wind(self):
+        """The exact failure: ideal air, no wind reading, must not be "ok"."""
+        assert reading(temp=20.0, rh=65.0, wind=None, source="none").spray_advisory()[0] == "unknown"
+
+    def test_wind_from_the_airframe_is_rejected(self):
+        """A drone sits in its own downwash; that reading is of the rotors."""
+        level, why = reading(source="airframe").spray_advisory()
+        assert level == "unknown"
+        assert "downwash" in why
+
+    def test_speed_without_direction_is_not_enough(self):
+        """A spray record needs both, by regulation."""
+        level, why = reading(direction=None).spray_advisory()
+        assert level == "unknown"
+        assert "direction" in why
+
+    def test_a_stale_reading_is_not_trusted(self):
+        import time as _t
+
+        level, why = reading(at=_t.time() - 3600).spray_advisory()
+        assert level == "unknown"
+        assert "stale" in why
+
+    def test_a_fresh_reading_is_trusted(self):
+        import time as _t
+
+        assert reading(at=_t.time() - 60).spray_advisory()[0] == "ok"
+
+
+class TestWindThresholds:
+    def test_dead_calm_is_POOR_not_ideal(self):
+        """The counterintuitive one, and the one that catches people out.
+
+        Still air usually means a temperature inversion: fine droplets hang in a
+        stable layer and then travel a long way off target when it breaks. An
+        inexperienced operator reads dead calm as perfect spraying weather.
+        """
+        level, why = reading(wind=0.3).spray_advisory()
+        assert level == "poor"
+        assert "inversion" in why
+
+    @pytest.mark.parametrize("ms,expect", [
+        (0.2, "poor"),      # ~1 km/h  -- inversion risk
+        (1.5, "ok"),        # ~5 km/h
+        (3.5, "ok"),        # ~13 km/h
+        (4.8, "caution"),   # ~17 km/h
+        (7.0, "poor"),      # ~25 km/h
+    ])
+    def test_the_wind_band(self, ms, expect):
+        assert reading(wind=ms).spray_advisory()[0] == expect
+
+    def test_high_wind_beats_ideal_temperature(self):
+        """Wind dominates. 40 km/h in perfect air is still poor."""
+        level, why = reading(temp=20.0, rh=65.0, wind=11.0).spray_advisory()
+        assert level == "poor"
+        assert "windy" in why
+
+    def test_the_ok_reason_states_wind_first(self):
+        _, why = reading().spray_advisory()
+        assert why.startswith("9 km/h from 270 deg"), why
+
+
 class TestSprayAdvisory:
     def test_good_conditions(self):
-        level, _ = EnvironmentReading(temperature_c=20.0, humidity_pct=65.0).spray_advisory()
-        assert level == "ok"
+        assert reading(temp=20.0, rh=65.0).spray_advisory()[0] == "ok"
 
     def test_hot_is_poor(self):
-        level, reason = EnvironmentReading(temperature_c=34.0, humidity_pct=60.0).spray_advisory()
+        level, reason = reading(temp=34.0, rh=60.0).spray_advisory()
         assert level == "poor"
         assert "temperature" in reason
 
     def test_dry_air_is_poor(self):
-        level, reason = EnvironmentReading(temperature_c=22.0, humidity_pct=25.0).spray_advisory()
+        level, reason = reading(temp=22.0, rh=25.0).spray_advisory()
         assert level == "poor"
         assert "RH" in reason
 
     def test_very_humid_is_caution(self):
-        level, reason = EnvironmentReading(temperature_c=12.0, humidity_pct=98.0).spray_advisory()
+        level, reason = reading(temp=12.0, rh=98.0).spray_advisory()
         assert level == "caution"
         assert "humid" in reason or "VPD" in reason
 
     def test_cold_is_caution(self):
-        level, _ = EnvironmentReading(temperature_c=3.0, humidity_pct=70.0).spray_advisory()
-        assert level == "caution"
+        assert reading(temp=3.0, rh=70.0).spray_advisory()[0] == "caution"
 
     def test_unknown_without_a_reading(self):
         level, reason = EnvironmentReading().spray_advisory()
         assert level == "unknown"
         assert "no environmental reading" in reason
+
+    def test_the_record_carries_wind_for_compliance(self):
+        """Canadian spray records require wind speed AND direction."""
+        d = reading().to_dict()
+        assert d["wind_speed_ms"] == 2.5
+        assert d["wind_direction_deg"] == 270.0
+        assert d["wind_source"] == "mast"
+        assert "spray_advisory_reason" in d
 
     def test_advisory_is_advisory_not_authorisation(self):
         """The label is authoritative; this only flags conditions worth a look."""
