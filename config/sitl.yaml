@@ -1,0 +1,60 @@
+# agri-edge against a simulated autopilot -- no aircraft, no camera.
+#
+# Two ways to feed this, and they prove different things:
+#
+#   bash scripts/sitl.sh                              # real ArduCopter: EKF,
+#                                                     # failsafes, flight dynamics
+#   python workstation/fake_autopilot.py --duration 60  # scripted MAVLink only
+#
+# Then:
+#   agri-edge -c config/sitl.yaml fly --frames 20
+#
+# The camera is simulated (`fly --simulate` supplies frames); the TELEMETRY is
+# real MAVLink over UDP either way. That is the point -- the path this exercises
+# is capture -> QA gating on live telemetry -> inference -> spool.
+#
+# Inference is green-on-brown here rather than a YOLOX model: it needs no model
+# file and no accelerator, so this config runs on a bare checkout.
+
+site: sitl-bench
+field_id: simulated-plot
+capture:
+  resolution:
+  - 1280
+  - 960
+  interval_s: 1.0
+  output_dir: ./data/sitl/raw
+  max_telemetry_age_s: 2.0
+qa:
+  blur_threshold: 100.0
+  overexposed_fraction: 0.05
+  underexposed_fraction: 0.05
+  saturation_high: 250
+  saturation_low: 5
+  min_fix_type: 3
+  require_rtk_fixed: false
+  max_hdop: 2.5
+  min_satellites: 6
+  required_bands: []
+inference:
+  enabled: true
+  backend: greenonbrown
+  model_path: null
+  confidence_threshold: 0.3
+  input_size:
+  - 640
+  - 640
+  class_names:
+  - vegetation
+  tiled: false
+  tile_size: 640
+  tile_overlap: 0.2
+  max_tiles: 64
+spool:
+  spool_dir: ./data/sitl/spool
+  max_bytes: 2147483648
+  upload_endpoint: null
+mavlink:
+  connection: udpin:0.0.0.0:14550
+  source_system: 200
+  heartbeat_timeout_s: 5.0

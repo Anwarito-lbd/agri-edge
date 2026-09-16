@@ -49,8 +49,16 @@ def cmd_fly(args) -> int:
     # for, and a flag to switch it off would eventually be left on in flight.
     # Supplying synthetic telemetry keeps the gate intact and makes the fake
     # position obvious in every sidecar it touches.
+    # --sitl is the mirror of --bench: SYNTHETIC camera, REAL telemetry. It is the
+    # combination needed to test against ArduPilot SITL or workstation/
+    # fake_autopilot.py, where there is a genuine MAVLink stream but no camera.
+    #
+    # Note which half is fake in each mode. --bench fabricates POSITION, so its
+    # data must never be mapped. --sitl fabricates IMAGERY, so its detections mean
+    # nothing -- but the telemetry, and therefore every QA gate that reads it, is
+    # real. That is precisely what makes it useful for fault injection.
     simulate_telemetry = args.simulate or args.bench
-    simulate_camera = args.simulate
+    simulate_camera = args.simulate or args.sitl
 
     telemetry = build_telemetry_source(cfg.mavlink, simulated=simulate_telemetry)
     camera = build_camera(cfg.capture, simulated=simulate_camera, bands=bands)
@@ -58,7 +66,14 @@ def cmd_fly(args) -> int:
     engine = build_engine(cfg.inference)
     environment = build_environment_sensor(cfg.capture, simulated=simulate_camera)
 
-    mode = "SIMULATED" if args.simulate else ("BENCH" if args.bench else "LIVE")
+    if args.simulate:
+        mode = "SIMULATED"
+    elif args.bench:
+        mode = "BENCH"
+    elif args.sitl:
+        mode = "SITL"
+    else:
+        mode = "LIVE"
     print(f"Site: {cfg.site} | Field: {cfg.field_id} | Bands: {', '.join(bands)}")
     print(f"Mode: {mode} | Spool: {cfg.spool.spool_dir}")
     if args.bench:
@@ -66,6 +81,13 @@ def cmd_fly(args) -> int:
             "\n  BENCH MODE: real camera, SYNTHETIC telemetry. Every position recorded\n"
             "  in this run is fabricated. Do not use this data for mapping, and do not\n"
             "  use this flag in flight.\n"
+        )
+    if args.sitl:
+        print(
+            "\n  SITL MODE: REAL telemetry, SYNTHETIC imagery. The positions and QA\n"
+            "  gates are genuine; the pictures are not, so any detection in this run\n"
+            "  is an artefact of the synthetic scene. Use it to test the pipeline,\n"
+            "  never to judge a model.\n"
         )
     if engine is not None and not engine.metadata.validated_locally:
         print(
@@ -239,6 +261,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p_fly = sub.add_parser("fly", help="Run the capture pipeline.")
     p_fly.add_argument("--simulate", action="store_true", help="Use simulated camera and telemetry.")
+    p_fly.add_argument(
+        "--sitl", action="store_true",
+        help="Simulated camera, REAL telemetry. For ArduPilot SITL or "
+             "workstation/fake_autopilot.py -- see config/sitl.yaml.",
+    )
     p_fly.add_argument(
         "--bench", action="store_true",
         help="Real camera, synthetic telemetry. Bench testing with no autopilot attached.",
