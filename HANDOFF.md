@@ -25,7 +25,7 @@ posture. See [NOTICE.md](NOTICE.md).
 
 ## Current progress
 
-**469 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
+**520 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
 
 ### Working
 
@@ -38,7 +38,8 @@ posture. See [NOTICE.md](NOTICE.md).
 | Model provenance | Derived per dataset; an unregistered dataset refuses to export |
 | Green-on-brown detection | Classical ExG thresholding, no model, no NPU (OpenWeedLocator, MIT) |
 | MAVLink fault injection | Real protocol via `workstation/fake_autopilot.py` |
-| Treatment geofence | Flight boundary vs treatment boundary, with buffer |
+| Treatment geofence | Flight boundary vs treatment boundary, GeoJSON, wired into the pipeline |
+| Detection georeferencing | Ray-plane intersection -> lat/lon + error budget per detection |
 | farmOS integration | Observation logs, stdlib only, credentials from the environment |
 | WebODM integration | Spool -> geotagged JPEG -> orthomosaic/DSM |
 | Store-and-forward uploader | Metadata-first, priority-ordered, stdlib only |
@@ -114,6 +115,26 @@ Reproduce: `python training/evaluate.py --model models/imageweeds_yolox_s.onnx
 --root data/imageweeds --split test --collapse-to weed`
 
 ---
+
+## The safety gate has TWO conditions now (16 Sept)
+
+`Detection.may_drive_treatment` used to mean only "is this model validated".
+It now means:
+
+    validated_locally AND in_treatment_zone is True
+
+The second **fails closed**: `None` means the question was never asked -- no
+boundary configured, or the detection could not be georeferenced -- and an
+unasked question is not a yes. A farm therefore cannot leave decision-support
+mode without deliberately defining a treatment boundary, which is the right
+thing to be unable to reach by accident.
+
+Enabling treatment now requires, in order: fly your own fields, annotate,
+retrain, set `validated_locally: true`, **and** supply
+`treatment_zone.boundary_geojson`. Miss any one and nothing is treatable.
+
+This module computes the answer; the report puts **enforcement** on the payload
+MCU, independent of this computer, so a fault in Linux cannot open a valve.
 
 ## The five integrated projects (15 Sept)
 
@@ -226,6 +247,24 @@ posture intact. See NOTICE.md for the AGPL network clause in particular.
    of the process being killed mid-write (session restart), not a CUDA fault.
    `latest_ckpt.pth` was intact, so `train_resilient.py` resumed at a cost of one
    epoch. **Check the log tail for nulls before hunting for an exception.**
+18. **A belly-mounted camera follows the BELLY, not the wing.** Positive roll
+   drops the right wing and swings the camera's view **west** when heading north;
+   positive pitch swings it **north**. Opposite handedness, and getting roll
+   backwards mirrors an entire flight about its own track while looking perfectly
+   plausible frame by frame. Pinned by its own test in `test_georeference.py`.
+19. **`inference.confidence_threshold` means different things per backend.** A
+   probability for YOLOX (0.30 = permissive) and index strength for
+   green-on-brown, where field vegetation scores 0.10-0.20. The same 0.30
+   therefore discards *everything* from green-on-brown. Found by getting zero
+   detections on a synthetic scene that was 30% vegetation. **Set it explicitly
+   when switching backends.**
+20. **Two repos evaluated and rejected (16 Sept).**
+   `Abrar0703/DADIS` has **no licence** (all rights reserved), is automotive, and
+   is a 5-commit educational prototype built on Ultralytics AGPL.
+   `Maelic/RelateAnything` is subtler: the *code* is Apache-2.0 but the
+   **weights** derive from DINOv3 (DINOv3 licence) with annotations from Gemma
+   (Gemma Terms of Use), so the artefact you would ship is not permissively
+   licensed. **Check the weights' licence, not just the repo's.**
 17. **`nvidia-smi` clock readings are unreliable on this laptop.** It reported
    22–44 MHz of 3090 with *no throttle reason active*, while YOLOX logged
    2.5 s/iter; an hour later, same reported clock (217 MHz), 0.264 s/iter — near
