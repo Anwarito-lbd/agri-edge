@@ -186,7 +186,20 @@ class TestInferenceGating:
             assert d["validated_locally"] is False
             assert d["may_drive_treatment"] is False
 
-    def test_validated_model_may_drive_treatment(self, tmp_path):
+    def test_a_validated_model_alone_does_NOT_authorise_treatment(self, tmp_path):
+        """Validation is necessary and not sufficient. Two gates, both required.
+
+        This used to assert the opposite -- that a validated model was enough --
+        which made `may_drive_treatment` a pure provenance question. It is now
+        also a geometry question: the detection must be inside the TREATMENT
+        geofence, the boundary set inside the flight boundary so a headland turn
+        cannot spray over the fence.
+
+        With no boundary configured, `in_treatment_zone` is None, and an unasked
+        question is not a yes. So a farm cannot leave decision-support mode
+        without deliberately defining where treatment is allowed -- which is the
+        correct thing to be unable to do by accident.
+        """
         engine = SimulatedEngine()
         engine.metadata = ModelMetadata(
             name="canola-weed", version="1.2.0", validated_locally=True,
@@ -194,8 +207,22 @@ class TestInferenceGating:
         )
         meta = build(tmp_path, engine=engine).process_once()
         assert meta["model"]["validated_locally"] is True
-        assert all(d["may_drive_treatment"] for d in meta["detections"])
-        assert meta["decision_support_only"] is False
+        assert not any(d["may_drive_treatment"] for d in meta["detections"])
+        assert meta["decision_support_only"] is True
+
+    def test_both_gates_together_do_authorise_treatment(self):
+        """The only combination that opens the gate."""
+        from agri_edge.inference.engine import Detection
+
+        d = Detection(label="kochia", confidence=0.9, bbox=(0.4, 0.4, 0.6, 0.6),
+                      validated_locally=True, in_treatment_zone=True)
+        assert d.may_drive_treatment is True
+
+        for kw in ({"validated_locally": False, "in_treatment_zone": True},
+                   {"validated_locally": True, "in_treatment_zone": False},
+                   {"validated_locally": True, "in_treatment_zone": None}):
+            other = Detection(label="k", confidence=0.9, bbox=(0, 0, 1, 1), **kw)
+            assert other.may_drive_treatment is False, kw
 
     def test_no_inference_on_qa_failed_frames(self, tmp_path):
         """Confident nonsense from a blurred frame is worse than no output."""

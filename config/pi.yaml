@@ -100,6 +100,40 @@ inference:
   tile_overlap: 0.2
   max_tiles: 64
 
+# Where a detection's pixels become a place on the ground. Off by default:
+# without a real AGL altitude and heading, every position would be fiction.
+#
+# These come off the camera's datasheet. A wrong focal length scales every
+# ground position by a constant, which looks exactly like a GNSS offset.
+camera_geometry:
+  enabled: false
+  sensor_width_mm: 7.4      # Pi Camera Module 3 (IMX708)
+  focal_length_mm: 4.74
+  # Camera rotation on the airframe, clockwise from "top of image at the nose".
+  # 90 for a camera bolted on sideways. Wrong here rotates an entire flight.
+  yaw_offset_deg: 0.0
+  # How far the real ground may sit from the flat plane the projection assumes.
+  # Feeds the per-detection error budget. Measure your field, or fit a
+  # rangefinder and stop guessing.
+  terrain_uncertainty_m: 2.0
+
+# WHERE APPLICATION IS PERMITTED -- not where the aircraft may fly.
+#
+# Two boundaries, deliberately. The aircraft may fly the whole field; treatment
+# is forced off buffer_m inside the edge, because an aircraft flying the
+# boundary still has to turn around and will overshoot. Gate application on the
+# flight boundary alone and every headland turn sprays over the fence.
+#
+# Leave null and NO detection is ever marked treatable. That is the safe
+# default: a farm cannot leave decision-support mode without deciding where
+# treatment is allowed.
+#
+# This computes the answer. Enforcement belongs on the payload controller,
+# independent of this computer, so a fault here cannot open a valve.
+treatment_zone:
+  boundary_geojson: null    # path to a GeoJSON Polygon, EPSG:4326
+  buffer_m: 10.0
+
 spool:
   spool_dir: ./data/spool
   # Sized for a 128 GB card with headroom for the OS. The quota evicts uploaded

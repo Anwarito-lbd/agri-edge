@@ -174,3 +174,88 @@ class TestSprayMaths:
     def test_full_overlap_is_rejected(self):
         with pytest.raises(ValueError):
             coverage_rate_ha_h(5.0, 40.0, overlap=1.0)
+
+
+class TestGeoJSONLoading:
+    """Reading a field boundary from what mapping tools actually export."""
+
+    LAT, LON = 49.8951, -97.1384
+    D = 200.0 / 111320.0            # ~200 m, expressed in degrees of latitude
+
+    def _ring(self):
+        la, lo, d = self.LAT, self.LON, self.D
+        return [[lo - d, la - d], [lo + d, la - d], [lo + d, la + d],
+                [lo - d, la + d], [lo - d, la - d]]
+
+    def _write(self, tmp_path, obj, name="f.geojson"):
+        import json
+        p = tmp_path / name
+        p.write_text(json.dumps(obj), encoding="utf-8")
+        return p
+
+    def test_bare_polygon(self, tmp_path):
+        from agri_edge.geo.geofence import load_boundary_geojson
+        p = self._write(tmp_path, {"type": "Polygon", "coordinates": [self._ring()]})
+        ring, _ = load_boundary_geojson(p)
+        assert len(ring) == 4          # closing vertex dropped
+
+    def test_feature_and_featurecollection_both_work(self, tmp_path):
+        """All three shapes are what real exports look like."""
+        from agri_edge.geo.geofence import load_boundary_geojson
+        geom = {"type": "Polygon", "coordinates": [self._ring()]}
+        feat = {"type": "Feature", "properties": {}, "geometry": geom}
+        for obj in (feat, {"type": "FeatureCollection", "features": [feat]}):
+            ring, _ = load_boundary_geojson(self._write(tmp_path, obj))
+            assert len(ring) == 4
+
+    def test_geojson_is_longitude_first(self, tmp_path):
+        """[lon, lat]. Reversed puts the field in the wrong hemisphere."""
+        from agri_edge.geo.geofence import load_boundary_geojson
+        p = self._write(tmp_path, {"type": "Polygon", "coordinates": [self._ring()]})
+        _, origin = load_boundary_geojson(p)
+        assert origin[0] == pytest.approx(self.LAT - self.D)   # a latitude
+        assert origin[1] == pytest.approx(self.LON - self.D)   # a longitude
+
+    def test_area_reflects_the_longitude_cosine(self, tmp_path):
+        """The reason everything downstream is in metres.
+
+        The ring spans the same number of DEGREES north-south and east-west, but
+        at 49.9 N a degree of longitude is only cos(49.9) = 0.64 as wide. So the
+        field is 400 m x 258 m, not square -- which is invisible if you work in
+        degrees and obvious once projected.
+        """
+        from agri_edge.geo.geofence import TreatmentGeofence, load_boundary_geojson
+        ring, _ = load_boundary_geojson(
+            self._write(tmp_path, {"type": "Polygon", "coordinates": [self._ring()]}))
+        assert TreatmentGeofence(ring).area_ha == pytest.approx(10.3, rel=0.05)
+
+    def test_a_line_is_rejected(self, tmp_path):
+        """A treatment boundary must be an area."""
+        from agri_edge.geo.geofence import load_boundary_geojson
+        p = self._write(tmp_path, {"type": "LineString", "coordinates": [[0, 0], [1, 1]]})
+        with pytest.raises(ValueError, match="Polygon"):
+            load_boundary_geojson(p)
+
+    def test_a_degenerate_ring_is_rejected(self, tmp_path):
+        from agri_edge.geo.geofence import load_boundary_geojson
+        p = self._write(tmp_path, {"type": "Polygon", "coordinates": [[[0, 0], [1, 1]]]})
+        with pytest.raises(ValueError, match="at least 4"):
+            load_boundary_geojson(p)
+
+    def test_gating_near_the_edge(self, tmp_path):
+        """Inside the field but within the buffer: fly yes, treat no."""
+        from agri_edge.geo.geofence import (
+            TreatmentGeofence, load_boundary_geojson, project_to_local,
+        )
+        ring, origin = load_boundary_geojson(
+            self._write(tmp_path, {"type": "Polygon", "coordinates": [self._ring()]}))
+        gf = TreatmentGeofence(ring, treatment_buffer_m=10.0)
+
+        def at(lat, lon):
+            e, n = project_to_local([lat], [lon], origin)[0]
+            return gf.may_fly((e, n)), gf.may_treat((e, n))
+
+        assert at(self.LAT, self.LON) == (True, True)                      # centre
+        assert at(self.LAT - self.D + 5 / 111320, self.LON) == (True, False)   # 5 m in
+        assert at(self.LAT - self.D + 50 / 111320, self.LON) == (True, True)   # 50 m in
+        assert at(self.LAT - self.D - 20 / 111320, self.LON) == (False, False)  # outside

@@ -163,6 +163,50 @@ class Pipeline:
             mount=CameraMount(yaw_offset_deg=geom.yaw_offset_deg),
             terrain_uncertainty_m=geom.terrain_uncertainty_m,
         )
+        self._check_treatment_zone(detections)
+
+    def _check_treatment_zone(self, detections: list) -> None:
+        """Mark which detections sit inside the treatment boundary.
+
+        Only detections with a position can be judged. One without stays None --
+        an unasked question, which `may_drive_treatment` treats as "no".
+        """
+        fence = self._treatment_fence()
+        if fence is None:
+            return
+        poly, origin = fence
+        from ..geo.geofence import TreatmentGeofence, project_to_local
+
+        gf = TreatmentGeofence(poly, self.cfg.treatment_zone.buffer_m)
+        for d in detections:
+            if not d.has_position:
+                continue
+            east, north = project_to_local([d.lat], [d.lon], origin)[0]
+            d.in_treatment_zone = gf.may_treat((east, north))
+
+    def _treatment_fence(self):
+        """Load the boundary once and cache it. None when none is configured.
+
+        A boundary that fails to load is logged and treated as absent, which
+        means nothing becomes treatable -- the safe direction. Refusing to fly
+        over a malformed GeoJSON would be worse: the imagery is still worth
+        having, and only the treatment authorisation depends on this.
+        """
+        if hasattr(self, "_fence_cache"):
+            return self._fence_cache
+        self._fence_cache = None
+        path = self.cfg.treatment_zone.boundary_geojson
+        if path is not None:
+            from ..geo.geofence import load_boundary_geojson
+
+            try:
+                self._fence_cache = load_boundary_geojson(path)
+            except Exception as exc:
+                log.error(
+                    "Treatment boundary %s could not be loaded (%s). No detection "
+                    "will be marked treatable this flight.", path, exc,
+                )
+        return self._fence_cache
 
     def _index_summaries(self, frame: Frame) -> dict:
         """Compute whichever vegetation indices this payload supports.

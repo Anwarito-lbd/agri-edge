@@ -42,6 +42,7 @@ the conversion once, explicitly, at a stated origin.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -256,3 +257,48 @@ def coverage_rate_ha_h(speed_m_s: float, swath_m: float, overlap: float = 0.0) -
     if not 0.0 <= overlap < 1.0:
         raise ValueError(f"overlap must be in [0, 1), got {overlap}")
     return speed_m_s * swath_m * (1.0 - overlap) * 3600.0 / 10_000.0
+
+
+def load_boundary_geojson(path, origin: tuple[float, float] | None = None):
+    """Read a GeoJSON Polygon and return (local-metre ring, origin lat/lon).
+
+    Accepts a bare Polygon, a Feature, or a FeatureCollection whose first feature
+    is a Polygon -- all three are what mapping tools actually export, and
+    rejecting two of them would just mean the user edits the file by hand.
+
+    Only the OUTER ring is used. Holes (a slough, a yard site) are silently
+    ignored rather than half-supported, and that is stated here because a hole
+    the code ignores is a place it would wrongly permit treatment.
+
+    The origin defaults to the first vertex, so all planning happens in metres
+    about the field itself. Returns degrees nowhere.
+    """
+    import json
+
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    geom = data
+    if data.get("type") == "FeatureCollection":
+        features = data.get("features") or []
+        if not features:
+            raise ValueError(f"{path}: FeatureCollection has no features.")
+        geom = features[0].get("geometry", {})
+    elif data.get("type") == "Feature":
+        geom = data.get("geometry", {})
+
+    if geom.get("type") != "Polygon":
+        raise ValueError(
+            f"{path}: need a Polygon, got {geom.get('type')!r}. A treatment "
+            "boundary must be an area, not a point or a line."
+        )
+    ring = geom.get("coordinates", [[]])[0]
+    if len(ring) < 4:
+        raise ValueError(f"{path}: a polygon ring needs at least 4 positions.")
+
+    # GeoJSON is [lon, lat]. Reversed, the field lands in the wrong hemisphere.
+    lons = [float(p[0]) for p in ring]
+    lats = [float(p[1]) for p in ring]
+    if ring[0] == ring[-1]:
+        lons, lats = lons[:-1], lats[:-1]   # drop the repeated closing vertex
+
+    org = origin or (lats[0], lons[0])
+    return project_to_local(lats, lons, org), org

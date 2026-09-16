@@ -210,11 +210,19 @@ class TestSafety:
         assert all(not d.may_drive_treatment for d in dets)
 
     def test_validated_flag_is_preserved_when_true(self):
+        """Tiling must not silently downgrade provenance.
+
+        Asserts `validated_locally` rather than `may_drive_treatment`, which is
+        what this test actually cares about: that the flag survives being split
+        across tiles and reassembled. `may_drive_treatment` additionally requires
+        a treatment-geofence pass, which is a question about geography and has
+        nothing to do with tiling.
+        """
         inner = FixedDetectionEngine(validated=True)
         dets = TiledEngine(inner, tile_size=640).infer(
             np.zeros((1280, 1280, 3), dtype=np.uint8)
         )
-        assert dets and all(d.may_drive_treatment for d in dets)
+        assert dets and all(d.validated_locally for d in dets)
 
     def test_excessive_tile_count_fails_loudly(self):
         """Silently running hundreds of inferences per frame is worse than an error."""

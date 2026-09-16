@@ -56,6 +56,11 @@ class Detection:
     position_error_m: float | None = None
     geo_error: str | None = None
 
+    # Whether this detection sits inside the TREATMENT geofence -- the boundary
+    # inside the flight boundary, where application is permitted (see
+    # geo/geofence.py). None means the question was never asked.
+    in_treatment_zone: bool | None = None
+
     @property
     def has_position(self) -> bool:
         return self.lat is not None and self.lon is not None
@@ -64,10 +69,22 @@ class Detection:
     def may_drive_treatment(self) -> bool:
         """Whether this detection is permitted to generate a treatment prescription.
 
-        False until the model behind it has been validated on local imagery. A
-        detection that cannot pass this gate is decision support only.
+        **Two independent conditions, both required**, following the safety
+        architecture in the research report: the model may propose, deterministic
+        geometry decides whether the proposal may be executed.
+
+        1. `validated_locally` -- the model has been checked against local field
+           imagery. Without it, the detection is decision support only.
+        2. `in_treatment_zone is True` -- the detection has a known position AND
+           that position is inside the treatment boundary.
+
+        Condition 2 **fails closed**. `None` means the question was never asked --
+        no geofence configured, or the detection could not be georeferenced -- and
+        an unasked question is not a yes. So enabling treatment requires
+        deliberately defining a boundary and successfully placing the detection
+        inside it; neither can be arrived at by accident.
         """
-        return self.validated_locally
+        return self.validated_locally and self.in_treatment_zone is True
 
     def to_dict(self) -> dict:
         out = {
@@ -86,6 +103,8 @@ class Detection:
                 out["position_error_m"] = self.position_error_m
         elif self.geo_error is not None:
             out["geo_error"] = self.geo_error
+        if self.in_treatment_zone is not None:
+            out["in_treatment_zone"] = self.in_treatment_zone
         return out
 
 

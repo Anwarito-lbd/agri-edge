@@ -15,6 +15,30 @@ import yaml
 
 
 @dataclass
+class TreatmentZoneConfig:
+    """Where application is permitted -- NOT where the aircraft may fly.
+
+    Two boundaries, deliberately. The aircraft may fly the whole field; treatment
+    is forced off `buffer_m` inside the edge, because an aircraft flying the
+    boundary still has to turn around and will overshoot. Gating application on
+    the flight boundary alone sprays every headland turn onto whatever is next
+    door. See geo/geofence.py.
+
+    `boundary_geojson` is a path to a GeoJSON Polygon in EPSG:4326. Leave null
+    and no detection is ever marked treatable -- which is the safe default, and
+    means a farm cannot leave decision-support mode without deciding where
+    treatment is allowed.
+
+    This computes and records the answer. The research report puts ENFORCEMENT on
+    the payload controller, independent of this computer, so that a fault in
+    Linux cannot open a valve. Treat a True here as necessary, never sufficient.
+    """
+
+    boundary_geojson: Path | None = None
+    buffer_m: float = 10.0
+
+
+@dataclass
 class CameraGeometry:
     """The lens, so a detection's pixels can become a place on the ground.
 
@@ -207,6 +231,7 @@ class Config:
     field_id: str = "unnamed-field"
     capture: CaptureConfig = field(default_factory=CaptureConfig)
     camera_geometry: CameraGeometry = field(default_factory=CameraGeometry)
+    treatment_zone: TreatmentZoneConfig = field(default_factory=TreatmentZoneConfig)
     qa: QAConfig = field(default_factory=QAConfig)
     inference: InferenceConfig = field(default_factory=InferenceConfig)
     spool: SpoolConfig = field(default_factory=SpoolConfig)
@@ -248,6 +273,7 @@ class Config:
             field_id=raw.get("field_id", "unnamed-field"),
             capture=sub(CaptureConfig, "capture"),
             camera_geometry=sub(CameraGeometry, "camera_geometry"),
+            treatment_zone=sub(TreatmentZoneConfig, "treatment_zone"),
             qa=sub(QAConfig, "qa"),
             inference=sub(InferenceConfig, "inference"),
             spool=sub(SpoolConfig, "spool"),
