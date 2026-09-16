@@ -25,7 +25,7 @@ posture. See [NOTICE.md](NOTICE.md).
 
 ## Current progress
 
-**520 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
+**535 tests passing**, no hardware required. `pip install -e ".[dev]"` then `pytest`.
 
 ### Working
 
@@ -40,13 +40,14 @@ posture. See [NOTICE.md](NOTICE.md).
 | MAVLink fault injection | Real protocol via `workstation/fake_autopilot.py` |
 | Treatment geofence | Flight boundary vs treatment boundary, GeoJSON, wired into the pipeline |
 | Detection georeferencing | Ray-plane intersection -> lat/lon + error budget per detection |
+| Spray advisory | Wind-first; refuses a verdict without wind; dead calm flagged as inversion risk |
 | farmOS integration | Observation logs, stdlib only, credentials from the environment |
 | WebODM integration | Spool -> geotagged JPEG -> orthomosaic/DSM |
 | Store-and-forward uploader | Metadata-first, priority-ordered, stdlib only |
 | Environmental sensing (BME280) | Temp/humidity/pressure + dew point + VPD + spray advisory |
 | Read-only MAVLink telemetry | Safety contract enforced by test |
 | Dependency boundary | Pi runtime imports with numpy + PyYAML alone, test-enforced |
-| CI | `.github/workflows/test.yml`, Python 3.11 + 3.12 |
+| CI | Two jobs: lean (proves the numpy-only boundary) + extras (proves the optional paths run) |
 
 ### Models
 

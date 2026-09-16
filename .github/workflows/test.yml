@@ -44,3 +44,46 @@ jobs:
         # Integration tests skip themselves when no exported model or dataset is
         # present, which is the case on a clean runner.
         run: pytest -q
+
+  # Second job, deliberately separate. The lean job above proves the Pi runtime
+  # installs with numpy + PyYAML alone; this one proves the code that NEEDS the
+  # optional extras actually works.
+  #
+  # Without it those tests skip silently on CI and only ever run on a developer's
+  # machine -- which is how the MAVLink fault matrix, the OpenCV paths and the
+  # ONNX backend could all rot without anyone noticing a green tick.
+  extras:
+    name: with optional extras
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install with the extras those tests need
+        # pymavlink   -> tests/test_mavlink_faults.py (real MAVLink over UDP)
+        # opencv      -> green-on-brown fast paths, YOLOX letterbox comparisons
+        # onnxruntime -> the deployed inference engine
+        # Pillow      -> WebODM geotagging
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pymavlink opencv-python-headless onnxruntime pillow
+
+      - name: Confirm the optional tests are actually running
+        # A skip here is indistinguishable from a pass in the summary line, so
+        # assert the count instead of trusting the tick.
+        run: |
+          pytest tests/test_mavlink_faults.py -q --no-header -rN | tee /tmp/mav.txt
+          grep -qE "[0-9]+ passed" /tmp/mav.txt
+          if grep -q "no tests ran\|skipped" /tmp/mav.txt; then
+            echo "MAVLink fault tests skipped -- pymavlink did not install."
+            exit 1
+          fi
+
+      - name: Run the suite
+        run: pytest -q
