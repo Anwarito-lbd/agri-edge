@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>Overview — Agri-Edge Ops</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;background:#0f1a0f;color:#e8f0e8;}
+main{padding:16px;max-width:1100px;margin:0 auto;}
+.card{background:#182818;border:1px solid #2d4a2d;border-radius:8px;padding:14px;margin:10px 0;}
+pre{background:#0a120a;padding:10px;overflow:auto;border-radius:6px;font-size:12px;}
+h1{font-size:1.4rem;} button{padding:8px 12px;cursor:pointer;}
+</style></head><body>
+<div id="sim-banner" style="background:#c45c00;color:#fff;padding:10px 16px;font-weight:700;letter-spacing:1px;text-align:center;">
+SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
+</div><nav style="display:flex;gap:12px;padding:12px;background:#1a2e1a;flex-wrap:wrap;">
+<a style="color:#b6f5b6" href="/ops/">Overview</a>
+<a style="color:#b6f5b6" href="/ops/map.html">Map</a>
+<a style="color:#b6f5b6" href="/ops/live.html">Live</a>
+<a style="color:#b6f5b6" href="/ops/weather.html">Weather</a>
+<a style="color:#b6f5b6" href="/ops/sensors.html">Sensors</a>
+<a style="color:#b6f5b6" href="/ops/alerts.html">Alerts</a>
+<a style="color:#b6f5b6" href="/ops/irrigation.html">Irrigation</a>
+</nav>
+<main>
+<h1>Overview</h1>
+<div id="content" class="card">Loading…</div>
+</main>
+<script>
+async function get(path){ const r=await fetch(path); return r.json(); }
+
+(async()=>{
+  await fetch('/api/ops/seed',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  const o=await get('/api/ops/overview');
+  document.getElementById('content').innerHTML=`<pre>${JSON.stringify(o,null,2)}</pre>`;
+})();
+
+</script>
+</body></html>

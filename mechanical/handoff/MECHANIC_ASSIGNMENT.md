@@ -81,6 +81,7 @@ A ground charging pad or dock for the **same** Phase 1 airframe so turnaround be
 - Survive **outdoor prairie weather** (sun, dust, rain, freeze–thaw — seal and material choices are yours)
 - Keep pad / posts / cables **clear of prop arcs** on approach and on the pad
 - Honour brief item **06**: **Pi clean shutdown before power cut** — the dock must not yank 5 V / battery mid-write; coordinate with Anwar on the shutdown signal / interlock story
+- Software interface note: [docs/DOCK_INTERFACE.md](../../docs/DOCK_INTERFACE.md) (status fields, handshake sequence/timeouts, phone `dock` topic shape, high-level contacts)
 - No requirement for autonomous docking in v1
 - Interface cleanly with the aircraft power architecture you built in Phase 1
 

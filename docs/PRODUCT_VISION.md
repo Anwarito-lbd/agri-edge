@@ -1,60 +1,46 @@
-# agri-edge — Product vision (website / roadmap)
+# Product vision — agri-edge
 
-Short public-facing roadmap. For the investor pitch see [PITCH.md](PITCH.md). For the builder see [../mechanical/handoff/MECHANIC_ASSIGNMENT.md](../mechanical/handoff/MECHANIC_ASSIGNMENT.md).
+**One-liner:** Canadian RPAS companion-computer scouting — edge AI, geo maps, alerts. Pilot/FC flies; phone never arms. Not a spray robot on day one.
 
-**Positioning:** companion-computer platform + scouting RPAS for Canadian farms — weeds, livestock, vigour — with edge QA and geo-mapped detections. Not a spray robot on day one.
+**Platform rule:** A new capability is usually a **model file or sensor**, not a rewrite. Sheep/weeds prove the pipe; thermal/MS/relations plug in next.
 
----
-
-## Geo mapping
-
-Every detection that can be georeferenced becomes a map object — lat/lon plus an error budget — so a farmer sees *where* the model looked, not only a thumbnail.
-
-- **Now:** edge spool with provenance; ray-plane georeferencing; coverage planning; treatment vs flight geofence for any future actuation.
-- **Next:** farmer-facing geo maps in the phone/app (fields, detection layers, mission footprints).
-- **Later:** deeper farmOS automation — structured events and layers into the farm system of record.
-
-Public models are scaffolding. Shipping maps that drive decisions requires imagery from *your* fields and `validated_locally`.
+See also: [NICHE_GAP_ANALYSIS.md](NICHE_GAP_ANALYSIS.md), [RELATE_ANYTHING.md](RELATE_ANYTHING.md), [PHONE_PI_CONTRACT.md](PHONE_PI_CONTRACT.md), [DOCK_INTERFACE.md](DOCK_INTERFACE.md).
 
 ---
 
-## Weather adaptation
+## Now (ship / demo)
 
-Prairie weather changes the mission before the model does.
+| Capability | Notes |
+|------------|--------|
+| Edge RGB detect (YOLOX) | Livestock + weeds — validate on own fields |
+| Green-on-brown (ExG) | Fallow / vegetation without NPU |
+| Georef + QA + geofence + wind advisory | Safety contracts |
+| Website + proof + dashboard map | Live |
+| Companion `/app` mock Pi | Alerts/status only |
+| Mechanic Phase 1 pack | STLs / renders |
 
-- **Now:** environment sensors on the airframe (clean-air boom); ground anemometer for wind (not on the aircraft — downwash ruins it); wind-first spray/scout advisory that refuses a verdict without wind.
-- **Next:** weather-gated missions — clear go / no-go and advisory surfaces in the companion app before launch.
-- **Later:** autonomous weather replan (full adapt). Advisory exists; closed-loop replan is roadmap, not current software.
+## Next (design + build without claiming live hardware)
 
----
+| Capability | Blocker |
+|------------|---------|
+| **Thermal / water-stress layer** | Thermal camera payload; Demo UI first |
+| **Multispectral NDVI/NDRE** | MS camera; index pipeline |
+| Live phone ↔ real Pi | Bookworm + gateway |
+| Disease / nutrient heads | Datasets + local labels |
+| **RelateAnything relations** | Laptop only; DINOv3 licence |
+| Charging dock handshake | Friend Phase 2 + DOCK_INTERFACE |
 
-## Emergency alerts + VR
+## Later
 
-Two different needs often get one label:
+| Capability | Notes |
+|------------|--------|
+| Soil moisture probe fusion | Ground IoT topic |
+| Stand count / emergence | RGB counting |
+| Spot-spray closed loop | Regs + validation first |
+| VR situational view | After live downlink |
+| Hailo HEF speed | AI HAT+ |
 
-| Need | Right tool | Horizon |
-|------|------------|---------|
-| Something looks wrong *now* | Phone alert + live status / video path | **Later** (alerts); live downlink before VR |
-| Review the farm *after* | Photogrammetry mesh + VR / WebXR viewer | **Later** |
+## Demo vs Hardware-blocked
 
-- **Now:** phone companion concept for **alerts & status**, read-only toward the aircraft. Pi never commands flight.
-- **Next:** richer status and farmer maps; weather gates.
-- **Later:** emergency phone alerts when an anomaly is flagged; VR first-person / situational check as a presentation layer over imagery and maps — not a substitute for a live downlink when seconds matter.
-
----
-
-## Safety (always on)
-
-1. **Pi never commands the aircraft** — MAVLink read-only by construction.
-2. **Treatment fails closed** without `validated_locally` **and** geofence membership. An unasked question is not a yes.
-
----
-
-## Mechanical roadmap (friend)
-
-| Phase | Deliverable |
-|-------|-------------|
-| **1 (priority)** | Flyable scouting quad to the handoff pack |
-| **2** | Charging station / dock for the same airframe (simple contacts or plug bay first) |
-
-Out of scope for early hardware: spray payload; autonomous docking as a v1 requirement; phone-commanded flight.
+- **Demo OK:** mock thermal/stress tiles, mock MS indices, mock relation insights — labelled Demo.  
+- **Hardware-blocked:** real °C maps, true NDVI, `validated_locally: true`, live LTE alerts.
