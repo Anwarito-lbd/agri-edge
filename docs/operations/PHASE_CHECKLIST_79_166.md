@@ -33,15 +33,15 @@ Generated with working code preferred over empty stubs. Legend: **DONE** / **PAR
 | 105 | DONE | VariableRatePrescription |
 | 106 | DONE | SafetyConstraints |
 | 107 | DONE | validate_prescription |
-| 108 | STUB | feedback_map_stub empty FeatureCollection |
+| 108 | DONE | feedback_maps commanded/actual/error FeatureCollections from sim segments |
 | 109 | DONE | Weather-aware mission validation (wind) |
-| 110 | PARTIAL | Microclimate MapAsset stub layer |
-| 111 | PARTIAL | Crop health MapAsset geotiff path stub |
-| 112 | STUB | MapField workflow via ODM submit stub |
-| 113 | STUB | ODM pipeline async non-blocking stub |
+| 110 | DONE | Microclimate interpolated grid GeoJSON measured vs interpolated + uncertainty |
+| 111 | DONE | Crop health MapAsset NDVI path + quality metadata |
+| 112 | DONE | MapField workflow select→sensor→GSD→route→validate→approve→execute→publish |
+| 113 | DONE | ODM async to done + RGB_ORTHO MapAsset; non-blocking |
 | 114 | DONE | MapCatalogue MapAsset layers list |
-| 115 | STUB | 3D scene_stub API |
-| 116 | STUB | VR flagged unsupported |
+| 115 | DONE | 3D scene API terrain/fields/vehicles/stations Cesium-ready JSON |
+| 116 | DONE | VR non-safety-critical; /api/ops/vr/status supported=false + reason |
 | 117 | DONE | TRANSPORT_NOTE abstraction |
 | 118 | DONE | OfflineGateway sync-without-dupe |
 | 119 | DONE | RetentionPolicy config |
@@ -55,10 +55,10 @@ Generated with working code preferred over empty stubs. Legend: **DONE** / **PAR
 | 127 | DONE | CalibrationRecord |
 | 128 | DONE | MaintenanceSchedule + engine |
 | 129 | DONE | Maintenance alerts |
-| 130 | PARTIAL | battery_analytics |
-| 131 | STUB | energy_analytics_stub |
-| 132 | PARTIAL | water_analytics |
-| 133 | STUB | application_analytics_stub |
+| 130 | DONE | battery analytics pack_id/cycles/soh from DeviceHealth seed |
+| 131 | DONE | energy_per_mission from seeded mission energy log |
+| 132 | DONE | water commanded vs measured + mismatch alert hook |
+| 133 | DONE | application weeds detected/treated/skipped from sim vision events |
 | 134 | DONE | KPI page transparent formulas, health_score=None |
 | 135 | DONE | DataOrigin FORECAST vs MEASURED vs DERIVED |
 | 136 | DONE | Frost workflow recommend-only |
@@ -67,14 +67,14 @@ Generated with working code preferred over empty stubs. Legend: **DONE** / **PAR
 | 139 | DONE | Rule-based irrigation skeleton no ML |
 | 140 | DONE | GreenhouseZone actuators_automated forced False |
 | 141 | DONE | PestObservation |
-| 142 | PARTIAL | CameraEvent model (sim may be empty) |
-| 143 | PARTIAL | ScoutReport model |
-| 144 | PARTIAL | ManualObservation model |
+| 142 | DONE | CameraEvent seed + API list/create |
+| 143 | DONE | ScoutReport seed + API list/create |
+| 144 | DONE | ManualObservation seed + API list/create |
 | 145 | DONE | Task model + API |
 | 146 | DONE | Timeline builder |
 | 147 | DONE | report_summary |
 | 148 | DONE | daily_brief factual only |
-| 149 | PARTIAL | MobileNote model |
+| 149 | DONE | MobileNote seed + API list/create |
 | 150 | DONE | Role enum |
 | 151 | DONE | AuditEntry + store.add_audit |
 | 152 | DONE | confirm_command helpers |
@@ -82,9 +82,9 @@ Generated with working code preferred over empty stubs. Legend: **DONE** / **PAR
 | 154 | DONE | Demo synthetic=true everywhere in seed |
 | 155 | DONE | Page nav /api/ops/nav + HTML pages |
 | 156 | DONE | Release-1 UI Overview/Map/Live/Weather/Sensors/Alerts |
-| 157 | PARTIAL | Release-2 irrigation page |
-| 158 | PARTIAL | Release-3 VRA API |
-| 159 | STUB | Release-5 3D/VR stub |
+| 157 | DONE | Irrigation page zone table from irrigation.zone_table + tests |
+| 158 | DONE | VRA approve + list cells + safety validate on approve |
+| 159 | DONE | Release-4/5 map3d.html SIMULATION banner linking scene API |
 | 160 | DONE | Test plans in tests/test_ops_*.py |
 | 161 | DONE | Failure/quality tests |
 | 162 | DONE | scripts/ops_acceptance_162.py |
@@ -94,9 +94,9 @@ Generated with working code preferred over empty stubs. Legend: **DONE** / **PAR
 | 166 | DONE | Demo script in docs + acceptance |
 
 ## Summary counts
-- DONE: 70
-- PARTIAL: 10
-- STUB: 8
+- DONE: 88
+- PARTIAL: 0
+- STUB: 0
 - Total: 88 (expect 88 sections: 79–166)
 
 ## Hardware-only remaining

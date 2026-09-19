@@ -1,11 +1,12 @@
-"""In-memory Ops store with optional SQLite persistence (§120)."""
 from __future__ import annotations
+"""In-memory Ops store with optional SQLite persistence (§120)."""
 
 import json
 import sqlite3
 from pathlib import Path
 from typing import Any, Optional
 
+from .db import get_sensor_db
 from .types import (
     Alert,
     CalibrationRecord,
@@ -70,6 +71,8 @@ class OpsStore:
         self.timeline: list[TimelineEvent] = []
         self.audit: list[AuditEntry] = []
         self.notes: list[MobileNote] = []
+        self.mission_energy: list = []  # MissionEnergyLog §131
+        self.vision_events: list = []  # VisionTreatmentEvent §133
         self.calibrations: list[CalibrationRecord] = []
         self.retention = RetentionPolicy()
         self.alerts = AlertEngine()
@@ -111,6 +114,9 @@ class OpsStore:
             "INSERT OR REPLACE INTO sensor_readings(reading_id, payload) VALUES (?, ?)",
             (reading.reading_id, json.dumps(reading.to_dict())),
         )
+        db = get_sensor_db()
+        if db is not None:
+            db.upsert(reading)
         con.commit()
         con.close()
 

@@ -17,16 +17,16 @@ from .simulate import seed_demo
 from .geo import demo_farm_geojson, TIME_RANGES, filter_by_time_range
 from .derived import derive_from_weather, gdd_stub
 from .irrigation import irrigation_dashboard, rule_based_irrigation
-from .vra import make_demo_prescription, validate_prescription, feedback_map_stub
-from .analytics import battery_analytics, energy_analytics_stub, water_analytics, application_analytics_stub, kpi_page
+from .vra import make_demo_prescription, validate_prescription, feedback_map_stub, approve_prescription, list_cells
+from .analytics import battery_analytics, energy_analytics, energy_analytics_stub, water_analytics, application_analytics, application_analytics_stub, kpi_page
 from .maintenance import check_calibration_due, default_schedules
 from .gateway import OfflineGateway, TRANSPORT_NOTE
 from .reports import daily_brief, report_summary, build_timeline
 from .commands import confirm_command
 from .odm import ODMPipelineStub
-from .map3d import scene_stub
+from .map3d import scene_stub, scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
-from .types import AlertState, DataOrigin, utcnow
+from .types import AlertState, DataOrigin, utcnow, new_id
 
 UI_DIR = Path(__file__).parent / "ui"
 HOST = "127.0.0.1"
@@ -159,11 +159,11 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/ops/analytics/battery":
                 return _json(self, 200, {**_banner(store), **battery_analytics(store)})
             if path == "/api/ops/analytics/energy":
-                return _json(self, 200, {**_banner(store), **energy_analytics_stub(store)})
+                return _json(self, 200, {**_banner(store), **energy_analytics(store)})
             if path == "/api/ops/analytics/water":
                 return _json(self, 200, {**_banner(store), **water_analytics(store)})
             if path == "/api/ops/analytics/application":
-                return _json(self, 200, {**_banner(store), **application_analytics_stub(store)})
+                return _json(self, 200, {**_banner(store), **application_analytics(store)})
             if path == "/api/ops/maintenance":
                 due = check_calibration_due(store.calibrations, store.alerts)
                 return _json(self, 200, {
@@ -214,7 +214,7 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/ops/odm":
                 return _json(self, 200, {**_banner(store), "jobs": [j.to_dict() for j in _odm.jobs.values()]})
             if path == "/api/ops/3d":
-                return _json(self, 200, {**_banner(store), **scene_stub()})
+                return _json(self, 200, {**_banner(store), **scene(store=store)})
             if path == "/api/ops/mqtt/topics":
                 # §124 topic catalogue (ground only)
                 return _json(self, 200, {
@@ -242,9 +242,61 @@ class OpsHandler(BaseHTTPRequestHandler):
                         {"id": "irrigation", "path": "/ops/irrigation.html", "release": 2},
                         {"id": "vra", "path": "/api/ops/vra", "release": 3},
                         {"id": "kpi", "path": "/api/ops/kpi", "release": 4},
-                        {"id": "3d", "path": "/api/ops/3d", "release": 5, "stub": True},
+                        {"id": "3d", "path": "/api/ops/3d", "release": 5, "stub": False, "path_ui": "/ops/map3d.html"},
                     ],
                 })
+            
+            if path == "/api/ops/vra/cells":
+                return _json(self, 200, {**_banner(store), **list_cells(_rx)})
+            if path == "/api/ops/vr/status":
+                return _json(self, 200, {**_banner(store), **vr_status()})
+            if path == "/api/ops/cameras":
+                return _json(self, 200, {**_banner(store), "items": [c.to_dict() for c in store.cameras]})
+            if path == "/api/ops/scouts":
+                return _json(self, 200, {**_banner(store), "items": [c.to_dict() for c in store.scouts]})
+            if path == "/api/ops/manual":
+                return _json(self, 200, {**_banner(store), "items": [c.to_dict() for c in store.manual]})
+            if path == "/api/ops/notes":
+                return _json(self, 200, {**_banner(store), "items": [c.to_dict() for c in store.notes]})
+            if path == "/api/ops/mapfield":
+                return _json(self, 200, {**_banner(store), "workflows": [w.to_dict() for w in _odm.workflows.values()]})
+
+            
+            if path == "/api/ops/vra/approve":
+                wind = body.get("wind_ms")
+                result = approve_prescription(_rx, actor=body.get("actor", "operator"), wind_ms=wind)
+                store.add_audit(body.get("actor", "operator"), "vra_approve", _rx.prescription_id, str(result.get("approved")))
+                return _json(self, 200, {**_banner(store), **result, "prescription": _rx.to_dict()})
+            if path == "/api/ops/mapfield/create":
+                wf = _odm.create_workflow(body.get("field_id", "field_north"), sensor=body.get("sensor", "rgb"), gsd_cm=float(body.get("gsd_cm", 2.5)))
+                return _json(self, 201, {**_banner(store), "workflow": wf.to_dict()})
+            if path == "/api/ops/mapfield/validate":
+                return _json(self, 200, {**_banner(store), **_odm.validate_workflow(body["workflow_id"])})
+            if path == "/api/ops/mapfield/approve":
+                return _json(self, 200, {**_banner(store), **_odm.approve_workflow(body["workflow_id"], actor=body.get("actor", "operator"))})
+            if path == "/api/ops/mapfield/execute":
+                return _json(self, 202, {**_banner(store), **_odm.execute_workflow(body["workflow_id"], store=store)})
+            if path == "/api/ops/cameras":
+                from .schema import CameraEvent
+                ev = CameraEvent(event_id=new_id("cam_"), camera_id=body.get("camera_id", "cam1"), ts=utcnow().isoformat(), label=body.get("label", "note"), confidence=float(body.get("confidence", 0.5)), image_path=body.get("image_path"), synthetic=True)
+                store.cameras.append(ev)
+                return _json(self, 201, ev.to_dict())
+            if path == "/api/ops/scouts":
+                from .schema import ScoutReport
+                ev = ScoutReport(report_id=new_id("sc_"), ts=utcnow().isoformat(), scout_id=body.get("scout_id", "scout"), notes=body.get("notes", ""), zone_id=body.get("zone_id"), synthetic=True)
+                store.scouts.append(ev)
+                return _json(self, 201, ev.to_dict())
+            if path == "/api/ops/manual":
+                from .schema import ManualObservation
+                ev = ManualObservation(obs_id=new_id("mo_"), ts=utcnow().isoformat(), observer=body.get("observer", "operator"), text=body.get("text", ""), category=body.get("category", "general"), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
+                store.manual.append(ev)
+                return _json(self, 201, ev.to_dict())
+            if path == "/api/ops/notes":
+                from .schema import MobileNote
+                ev = MobileNote(note_id=new_id("mn_"), ts=utcnow().isoformat(), author=body.get("author", "operator"), text=body.get("text", ""), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
+                store.notes.append(ev)
+                return _json(self, 201, ev.to_dict())
+
             return _json(self, 404, {"error": "not found", "path": path})
         except Exception as exc:  # noqa: BLE001
             return _json(self, 500, {"error": str(exc)})

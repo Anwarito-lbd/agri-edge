@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>3D Scene — Agri-Edge Ops</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;background:#0b1220;color:#e8eef8;}
+main{padding:16px;max-width:1100px;margin:0 auto;}
+.card{background:#152033;border:1px solid #2a3f5f;border-radius:8px;padding:14px;margin:10px 0;}
+pre{background:#0a1018;padding:10px;overflow:auto;border-radius:6px;font-size:12px;}
+a{color:#9ecbff}</style></head><body>
+<div style="background:#c45c00;color:#fff;padding:10px 16px;font-weight:700;letter-spacing:1px;text-align:center;">
+SIMULATION — 3D scene JSON for Cesium (synthetic). Not live telemetry. VR unsupported.
+</div>
+<nav style="display:flex;gap:12px;padding:12px;background:#101a2a;flex-wrap:wrap;">
+<a href="/ops/">Overview</a><a href="/ops/map.html">Map</a><a href="/ops/irrigation.html">Irrigation</a><a href="/ops/map3d.html">3D</a>
+</nav>
+<main>
+<h1>Release-4 / 5 — 3D Scene</h1>
+<p>Scene API: <code>/api/ops/3d</code> · VR status: <code>/api/ops/vr/status</code></p>
+<div id="vr" class="card">Loading VR status…</div>
+<div id="scene" class="card">Loading scene…</div>
+</main>
+<script>
+async function get(p){ const r=await fetch(p); return r.json(); }
+(async()=>{
+  const vr = await get('/api/ops/vr/status');
+  document.getElementById('vr').innerHTML = `<h3>VR status</h3><pre>${JSON.stringify(vr,null,2)}</pre>`;
+  const sc = await get('/api/ops/3d');
+  document.getElementById('scene').innerHTML = `<h3>Scene (Cesium-ready)</h3><pre>${JSON.stringify(sc,null,2)}</pre>`;
+})();
+</script>
+</body></html>

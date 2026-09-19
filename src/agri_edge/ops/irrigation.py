@@ -70,9 +70,50 @@ def irrigation_dashboard(store: Any) -> dict[str, Any]:
         "flow_meters": [f.to_dict() for f in store.flow_meters.values()],
         "avg_moisture_pct": avg,
         "recommendation": rec.to_dict(),
+        "zones": zone_table(store),
         "safety": {
             "ai_unrestricted_pump": False,
             "command_channel": "mqtt_ground_only",
             "auto_execute": False,
         },
     }
+
+
+
+def zone_table(store) -> list[dict]:
+    """§157 zone rows for irrigation UI."""
+    from .irrigation import rule_based_irrigation  # self-ok if defined above
+    moist_by_zone: dict[str, list[float]] = {}
+    for s in getattr(store, "soil", []) or []:
+        z = getattr(s, "zone_id", None) or "zone_a"
+        mp = getattr(s, "moisture_pct", None)
+        if mp is not None:
+            moist_by_zone.setdefault(z, []).append(float(mp))
+    valve_by_zone = {getattr(v, "zone_id"): v for v in store.valves.values()}
+    meter_by_zone = {}
+    meters = getattr(store, "flow_meters", None) or getattr(store, "flow_meters", {})
+    for m in meters.values():
+        z = getattr(m, "zone_id", None)
+        if z:
+            meter_by_zone[z] = m
+    zones = sorted(set(list(moist_by_zone) + list(valve_by_zone) + list(meter_by_zone)) or {"zone_a"})
+    # pick rule function
+    rule = globals().get("rule_based_irrigation") or globals().get("rule_based_irrigation")
+    rows = []
+    for z in zones:
+        vals = moist_by_zone.get(z, [])
+        avg = sum(vals) / len(vals) if vals else None
+        rec = rule(moisture_pct=avg, zone_id=z) if rule else None
+        v = valve_by_zone.get(z)
+        fm = meter_by_zone.get(z)
+        rows.append({
+            "zone_id": z,
+            "avg_moisture_pct": avg,
+            "valve_id": getattr(v, "valve_id", None) if v else None,
+            "valve_open_pct": getattr(v, "open_pct", None) if v else None,
+            "flow_lpm": getattr(fm, "last_lpm", None) if fm else None,
+            "recommendation": rec.to_dict() if rec and hasattr(rec, "to_dict") else None,
+            "auto_execute": False,
+            "synthetic": True,
+        })
+    return rows

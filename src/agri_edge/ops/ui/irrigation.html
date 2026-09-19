@@ -16,6 +16,7 @@ SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
 <a style="color:#b6f5b6" href="/ops/sensors.html">Sensors</a>
 <a style="color:#b6f5b6" href="/ops/alerts.html">Alerts</a>
 <a style="color:#b6f5b6" href="/ops/irrigation.html">Irrigation</a>
+<a style="color:#b6f5b6" href="/ops/map3d.html">3D</a>
 </nav>
 <main>
 <h1>Irrigation</h1>
@@ -26,7 +27,9 @@ async function get(path){ const r=await fetch(path); return r.json(); }
 
 (async()=>{
   const i=await get('/api/ops/irrigation');
-  document.getElementById('content').innerHTML=`<pre>${JSON.stringify(i,null,2)}</pre>
+  const zones=(i.zones||[]);
+  const rows=zones.map(z=>`<tr><td>${z.zone_id}</td><td>${z.avg_moisture_pct??''}</td><td>${z.valve_id??''}</td><td>${z.valve_open_pct??''}</td><td>${z.flow_lpm??''}</td><td>${z.recommendation?.action??''}</td></tr>`).join('');
+  document.getElementById('content').innerHTML=`<h3>Zones</h3><table border=1 cellpadding=6 style="border-collapse:collapse;width:100%;background:#0a120a"><tr><th>Zone</th><th>Moisture %</th><th>Valve</th><th>Open %</th><th>Flow LPM</th><th>Rec</th></tr>${rows}</table><pre>${JSON.stringify(i,null,2)}</pre>
   <p>Safety: auto_execute=false · mqtt_ground_only · no AI unrestricted pump</p>`;
 })();
 

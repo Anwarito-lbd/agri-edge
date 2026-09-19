@@ -102,9 +102,41 @@ class WaterUsageEvent:
     start_ts: str
     end_ts: Optional[str] = None
     volume_l: float = 0.0
+    commanded_volume_l: Optional[float] = None
+    measured_volume_l: Optional[float] = None
     reason: str = "irrigation"
     synthetic: bool = False
     farm_id: str = "demo_farm"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class MissionEnergyLog:
+    """§131 seeded mission energy for analytics."""
+    mission_id: str
+    vehicle_id: str
+    energy_kwh: float
+    duration_s: float
+    ts: str
+    synthetic: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class VisionTreatmentEvent:
+    """§133 sim vision + treatment events."""
+    event_id: str
+    ts: str
+    kind: str  # weed_detected|treated|skipped
+    lat: float
+    lon: float
+    confidence: float = 0.0
+    reason: str = ""
+    synthetic: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -135,7 +167,7 @@ class SensorReading:
 
 @dataclass
 class DeviceHealth:
-    """§125"""
+    """§125 + pack identity for battery analytics (§130)."""
     device_id: str
     ts: str
     online: bool = True
@@ -144,6 +176,9 @@ class DeviceHealth:
     uptime_s: Optional[float] = None
     firmware: Optional[str] = None
     error_code: Optional[str] = None
+    pack_id: Optional[str] = None
+    cycles: Optional[int] = None
+    soh: Optional[float] = None  # state of health 0–100
     synthetic: bool = False
 
     def to_dict(self) -> dict[str, Any]:

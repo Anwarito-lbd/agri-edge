@@ -19,6 +19,13 @@ from .types import (
     utcnow,
 )
 from .schema import (
+    WaterUsageEvent,
+    VisionTreatmentEvent,
+    MissionEnergyLog,
+    MobileNote,
+    ManualObservation,
+    ScoutReport,
+    CameraEvent,
     DeviceHealth,
     FlowMeter,
     GreenhouseZone,
@@ -142,8 +149,11 @@ def seed_demo(store: OpsStore, *, seed: int = 42) -> dict[str, Any]:
             ts=utcnow().isoformat(),
             online=True,
             battery_pct=d.battery_pct,
-            signal_rssi=d.signal_rssi,
+            signal_rssi=getattr(d, "signal_rssi", None),
             firmware="sim-1.0",
+            pack_id=f"pack_{d.device_id}",
+            cycles=12 + (abs(hash(d.device_id)) % 40),
+            soh=95.0 - (abs(hash(d.device_id)) % 10),
             synthetic=True,
         )
 
@@ -176,9 +186,84 @@ def seed_demo(store: OpsStore, *, seed: int = 42) -> dict[str, Any]:
     derived = derive_from_weather(air_c, rh)
     store.add_audit("system", "seed_demo", "store", "synthetic demo seeded", role="admin")
 
+    
+    # --- §110–111 map layers already via default_map_assets (enriched in geo) ---
+    # --- §132 water commanded vs measured ---
+    store.water_usage.append(
+        WaterUsageEvent(
+            event_id=new_id("wu_"),
+            zone_id="zone_a",
+            start_ts=utcnow().isoformat(),
+            end_ts=utcnow().isoformat(),
+            volume_l=250.0,
+            commanded_volume_l=200.0,
+            measured_volume_l=250.0,
+            reason="irrigation",
+            synthetic=True,
+        )
+    )
+    store.water_usage.append(
+        WaterUsageEvent(
+            event_id=new_id("wu_"),
+            zone_id="zone_b",
+            start_ts=utcnow().isoformat(),
+            volume_l=100.0,
+            commanded_volume_l=100.0,
+            measured_volume_l=98.0,
+            reason="irrigation",
+            synthetic=True,
+        )
+    )
+    # --- §131 mission energy ---
+    store.mission_energy.append(
+        MissionEnergyLog(
+            mission_id="msn_demo_1",
+            vehicle_id="ugv_sim_1",
+            energy_kwh=1.25,
+            duration_s=1800,
+            ts=utcnow().isoformat(),
+            synthetic=True,
+        )
+    )
+    store.mission_energy.append(
+        MissionEnergyLog(
+            mission_id="msn_demo_2",
+            vehicle_id="ugv_sim_1",
+            energy_kwh=0.85,
+            duration_s=1200,
+            ts=utcnow().isoformat(),
+            synthetic=True,
+        )
+    )
+    # --- §133 vision + treatment ---
+    store.vision_events.extend([
+        VisionTreatmentEvent(event_id=new_id("vt_"), ts=utcnow().isoformat(), kind="weed_detected", lat=45.401, lon=-75.698, confidence=0.91, synthetic=True),
+        VisionTreatmentEvent(event_id=new_id("vt_"), ts=utcnow().isoformat(), kind="treated", lat=45.401, lon=-75.698, confidence=0.91, synthetic=True),
+        VisionTreatmentEvent(event_id=new_id("vt_"), ts=utcnow().isoformat(), kind="weed_detected", lat=45.402, lon=-75.697, confidence=0.77, synthetic=True),
+        VisionTreatmentEvent(event_id=new_id("vt_"), ts=utcnow().isoformat(), kind="skipped", lat=45.402, lon=-75.697, confidence=0.77, reason="buffer_zone", synthetic=True),
+        VisionTreatmentEvent(event_id=new_id("vt_"), ts=utcnow().isoformat(), kind="weed_detected", lat=45.403, lon=-75.696, confidence=0.88, synthetic=True),
+        VisionTreatmentEvent(event_id=new_id("vt_"), ts=utcnow().isoformat(), kind="treated", lat=45.403, lon=-75.696, confidence=0.88, synthetic=True),
+    ])
+    # --- §142–144, §149 ---
+    store.cameras.append(
+        CameraEvent(event_id=new_id("cam_"), camera_id="cam_gate", ts=utcnow().isoformat(), label="wildlife", confidence=0.82, image_path="sim://cam/wildlife.jpg", synthetic=True)
+    )
+    store.scouts.append(
+        ScoutReport(report_id=new_id("sc_"), ts=utcnow().isoformat(), scout_id="scout_a", notes="Edge weeds near ditch", zone_id="zone_a", synthetic=True)
+    )
+    store.manual.append(
+        ManualObservation(obs_id=new_id("mo_"), ts=utcnow().isoformat(), observer="operator", text="Standing water after rain", category="water", lat=45.4015, lon=-75.6975, synthetic=True)
+    )
+    store.notes.append(
+        MobileNote(note_id=new_id("mn_"), ts=utcnow().isoformat(), author="operator", text="Check valve v1 tomorrow", lat=45.401, lon=-75.698, synthetic=True)
+    )
+
     return {
         "simulation": True,
         "synthetic": True,
+        "cameras": len(store.cameras),
+        "mission_energy": len(store.mission_energy),
+        "vision_events": len(store.vision_events),
         "devices": len(store.devices),
         "weather": len(store.weather),
         "soil": len(store.soil),
