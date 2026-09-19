@@ -92,3 +92,25 @@ agricultrul/
 - Website not duplicated here (correct split)
 - OWL algorithms already **ported** to `greenonbrown.py` — vendor is reference
 - AgOpenGPS vendor = guidance reference; geofence concepts in `geo/geofence.py`
+
+## Box re-probe addendum (2026-09-19 ~16:52 ET, `/workspace/agri-edge-repo`)
+
+Net-new facts from Linux box after parent Phase 0 docs landed. Does **not** replace desktop table.
+
+| Command | Purpose | Works? | Error / note | Required fix |
+|---------|---------|--------|--------------|--------------|
+| `pytest tests/test_sensing_p1.py tests/test_mqtt_topics.py` | P1 sensing + MQTT | **Yes** — 12 passed | Confirmed on box after `iot/` merge | — |
+| `pytest` (ignore provenance) + `pillow` | Broader suite | **Yes** — **588 passed, 13 skipped** (~15s) | `test_provenance` excluded (needs torch) | Optional: `pip install torch` for provenance only |
+| `pytest tests/test_provenance.py` | Training provenance | **No** (collection) | `ModuleNotFoundError: torch` via `training/export_onnx.py` | Workstation `[training]` / torch env; not Pi runtime |
+| `pytest tests/` lean (no pillow) | CI-like | Partial | 7× `test_data_prep` ERROR without Pillow; `test_webodm` also needs Pillow | Match CI `extras` job: `pillow` (+ pymavlink/opencv/onnxruntime) |
+| `bash scripts/sitl.sh` | ArduPilot SITL | **No** | `vendor/ardupilot` **missing** (gitignored; not cloned). Also no Docker on this box | Clone vendor + WSL/toolchain on desktop; or Docker image path in script header |
+| `bash scripts/hailo_compile.sh` | ONNX→HEF | **No** | Arch x86_64 OK; fails: `models/weed_crop_yolox_s.onnx` **absent** (binaries gitignored; only `*.meta.json` / CARD tracked) | Restore/export ONNX locally + Hailo DFC in WSL |
+| `docker compose -f ground_iot/...` | Mosquitto + Node-RED | **No** here | `docker: command not found` | Install Docker Desktop (desktop Stage 0) |
+| `make test` | Makefile stub | Stub exists | `make` binary **not installed** on this box; target runs sensing+mqtt only | `apt install make` optional; or call pytest directly |
+| ONNX weights in git | Deploy artifacts | N/A | Confirmed: `models/*.onnx` not in tree (`.gitignore`); meta/CARD only | Keep binaries local / artifact store; do not commit |
+
+### Workspace / remote notes
+- Canonical GitHub tree: `Anwarito-lbd/agri-edge` `master` (includes Phase 0 docs + `ground_iot` + `src/agri_edge/iot`).
+- Box `/workspace/agricultrul` was a **partial** overlay earlier; prefer `/workspace/agri-edge-repo` (git clone) or desktop OneDrive path for full tree.
+- Windows machineId path not reachable from this box agent; desktop writes owned by parent.
+- Large tracked binaries still: `mechanical/handoff_pack.tgz` (~6.4M), render PNGs ~2M each, `.blend` ~1.1M — already noted as handoff; no secrets found (no `.env` in tree).
