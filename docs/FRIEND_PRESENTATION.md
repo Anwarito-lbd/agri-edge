@@ -14,6 +14,10 @@
 
 ---
 
+## 1b. Platform, not “sheep app”
+
+Competitors sell thermal + multispectral + stress maps. We **already** have on-device CV, geo, QA, and safety. Sheep/weeds are the first models on a **platform**. Next: thermal, multispectral, disease — and laptop-side scene relations ([RelateAnything](RELATE_ANYTHING.md), licence-gated). Full gap table: [NICHE_GAP_ANALYSIS.md](NICHE_GAP_ANALYSIS.md).
+
 ## 2. What is DONE (Anwar’s side)
 
 | Area | Status |
