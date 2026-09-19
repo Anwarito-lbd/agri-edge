@@ -51,6 +51,7 @@ class OpsStore:
         self.soil: list[SoilObservation] = []
         self.sensors: dict[str, SensorReading] = {}
         self.sensor_readings: list[SensorReading] = []
+        self.detections: list[dict] = []
         self.health: dict[str, DeviceHealth] = {}
         self.water_sources: dict[str, WaterSource] = {}
         self.tanks: dict[str, Tank] = {}
@@ -119,6 +120,15 @@ class OpsStore:
             db.upsert(reading)
         con.commit()
         con.close()
+
+
+    def persist_detection(self, row: dict) -> None:
+        """Persist a normalized detection dict (SIMULATED / SQLite when DATABASE_URL set)."""
+        self.detections.append(row)
+        from .db import get_detection_db
+        db = get_detection_db()
+        if db is not None:
+            db.upsert(row)
 
     def persist_weather(self, obs: WeatherObservation) -> None:
         self.weather.append(obs)

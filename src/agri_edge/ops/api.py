@@ -110,6 +110,11 @@ class OpsHandler(BaseHTTPRequestHandler):
                         (store.weather_aggs[-1].air_temp_max_c or 20) if store.weather_aggs else 20,
                     ),
                 })
+            if path == "/api/ops/detections":
+                from .db import get_detection_db
+                db = get_detection_db()
+                rows = db.list(limit=200) if db is not None else list(getattr(store, "detections", []))
+                return _json(self, 200, {**_banner(store), "detections": rows, "count": len(rows), "status": "IMPLEMENTED"})
             if path == "/api/ops/sensors":
                 return _json(self, 200, {
                     **_banner(store),
@@ -313,6 +318,19 @@ class OpsHandler(BaseHTTPRequestHandler):
             return _json(self, 400, {"error": "invalid json"})
 
         try:
+            if path == "/api/ops/detections":
+                from .db import get_detection_db
+                row = dict(body)
+                row.setdefault("detection_id", body.get("detection_id") or body.get("id") or f"det_{len(getattr(store, 'detections', []))+1:05d}")
+                row.setdefault("ts", body.get("ts") or __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat().replace("+00:00", "Z"))
+                row.setdefault("label", body.get("label", "unknown"))
+                row.setdefault("confidence", float(body.get("confidence", 0.0)))
+                row.setdefault("bbox", body.get("bbox", [0, 0, 0, 0]))
+                row.setdefault("validated_locally", False)
+                row.setdefault("may_drive_treatment", False)
+                row.setdefault("synthetic", True)
+                store.persist_detection(row)
+                return _json(self, 201, {**_banner(store), "detection": row, "status": "IMPLEMENTED"})
             if path == "/api/ops/seed":
                 reset_store()
                 store = get_store()

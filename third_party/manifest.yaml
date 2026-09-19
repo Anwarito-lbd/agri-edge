@@ -1,0 +1,66 @@
+# Third-party components used by Agri-Edge.
+# Policy: record licences; do NOT blind-vendor copyleft trees into src/.
+# vendor/ clones (if present) are gitignored — see NOTICE.md.
+
+version: 1
+updated: "2026-09-19"
+policy:
+  no_blind_vendoring: true
+  prefer_process_boundary_for_copyleft: true
+
+components:
+  - name: YOLOX
+    upstream: https://github.com/Megvii-BaseDetection/YOLOX
+    licence: Apache-2.0
+    use: training + architecture reference; host decode in agri_edge.inference.yolox
+    vendored: false
+    notes: Export via training/export_onnx.py (not Ultralytics).
+
+  - name: onnxruntime
+    upstream: https://github.com/microsoft/onnxruntime
+    licence: MIT
+    use: CpuOnnxBackend / OnnxEngine
+    vendored: false
+
+  - name: HailoRT / Dataflow Compiler / hailo_model_zoo
+    upstream: https://hailo.ai/developer-zone/
+    licence: Hailo proprietary
+    use: ONNX→HEF compile (scripts/hailo_compile.sh); runtime on Pi AI HAT
+    vendored: false
+    status: BLOCKED-HARDWARE for device validation
+
+  - name: ArduPilot
+    upstream: https://github.com/ArduPilot/ardupilot
+    licence: GPL-3.0
+    use: FC / SITL via MAVLink process boundary (VehicleAdapter)
+    vendored: false
+    notes: Not linked into agri_edge; MAVLink only.
+
+  - name: pymavlink
+    upstream: https://github.com/ArduPilot/pymavlink
+    licence: LGPL-3.0
+    use: optional telemetry decode
+    vendored: false
+
+  - name: OpenWeedLocator (green-on-brown)
+    upstream: https://github.com/geezacoleman/OpenWeedLocator
+    licence: MIT
+    use: reference / greenonbrown engine inspiration
+    vendored: false
+
+  - name: farmOS
+    upstream: https://github.com/farmOS/farmOS
+    licence: GPL-2.0
+    use: HTTP JSON:API client stub
+    vendored: false
+
+  - name: WebODM
+    upstream: https://github.com/OpenDroneMap/WebODM
+    licence: AGPL-3.0
+    use: unmodified Docker + HTTP (process boundary)
+    vendored: false
+
+  - name: NumPy / PyYAML
+    licence: BSD-3 / MIT
+    use: core runtime
+    vendored: false

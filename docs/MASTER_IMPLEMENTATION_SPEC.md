@@ -1,6 +1,6 @@
-﻿# MASTER IMPLEMENTATION SPEC (governing)
+# MASTER IMPLEMENTATION SPEC (governing)
 
-**Source:** product owner brief 19 Sep 2026. Full phase text retained in conversation; this file is the durable summary agents must follow.
+**Source:** product owner brief. Full phase text retained in conversation; this file is the durable summary agents must follow.
 
 ## Mission
 Closed loop: SENSE → UNDERSTAND → GEOREFERENCE → DECIDE → SAFETY → ACT → MEASURE → LOG → MAP → LEARN. Agri-Edge is the integration brain; third parties are components.
@@ -36,7 +36,35 @@ REAL CAMERA → Pi 5 → Hailo → YOLOX → normalized detections → MQTT → 
 ## Definition of done
 Implementation + tests + docs + no secrets. Hardware tasks need explicit VALIDATED status (IMPLEMENTED / SIMULATED / BENCH / HARDWARE / FIELD).
 
-## Operations Station (mandatory — do not skip)
-See `docs/operations/OPERATIONS_STATION.md` (spec §§79–166).
-After Hailo/YOLOX camera milestone, parallelize Ops Station MVP: MQTT → sensor schema → sim weather/soil → PostGIS → Overview/Map/Weather/Sensors/Alerts.
-VR/3D is release 4 only.
+---
+
+## Phase checklist (master priorities 3–10) — updated 2026-09-19
+
+| # | Item | Status | Evidence |
+|---|------|--------|----------|
+| 3 | YOLOX pipeline validate | **DONE** | `tests/test_yolox_postprocess.py` (36 passed); interface in `docs/status.md` |
+| 3b | YOLOX→ONNX export path | **DONE** (BENCH deps) | `training/export_onnx.py` + `scripts/export_yolox_onnx.py` |
+| 4 | Hailo compile ONNX→HEF | **SIMULATED** | `scripts/hailo_compile.sh` + `scripts/hailo_compile.ps1` + `docs/architecture/hailo-compile.md` |
+| 4b | HEF inference on AI HAT | **BLOCKED-HARDWARE** | Needs Pi + HailoRT + real `.hef` |
+| 5 | Live camera on Pi | **BLOCKED-HARDWARE** | Capture scripts exist; no device this wave |
+| 6 | Normalized Detection API | **DONE** | `src/agri_edge/detection/` — Detection + DetectionBackend + CpuOnnx/Hailo/Simulated |
+| 6b | Model registry | **DONE** | `src/agri_edge/ai/registry.py` + `ai/model_registry/registry.json` |
+| 7 | MQTT vehicle + ground | **DONE** (prior) | Topics + bridge; irrigation ground MQTT only |
+| 8 | Backend SQLite/PostGIS | **DONE** / PostGIS schema **SIMULATED** | `src/agri_edge/ops/db.py` sensors+detections; `docs/operations/schema_postgis.sql`; `/api/ops/detections` |
+| 9 | Dashboard decisions UI | **PARTIAL** (prior Ops Station) | Ops UI Release-1; not reworked this wave |
+| 10 | VehicleAdapter + ArduPilot stub | **DONE** (SIMULATED cmds) | `src/agri_edge/vehicle/` fail-closed; SITL `scripts/sitl.sh` kept |
+| CI | Makefile `test`/`lint` + GHA | **DONE** | `Makefile`, `.github/workflows/test.yml` |
+| Licences | `third_party/manifest.yaml` | **DONE** | + NOTICE.md pointer |
+| Ops Station §79–166 | **DONE 88/88** | Do not redo | `docs/operations/PHASE_CHECKLIST_79_166.md` |
+
+### Explicitly BLOCKED-HARDWARE (this wave)
+- Live camera on Pi
+- Real HEF inference on AI HAT
+- Physical spray / actuator
+- Field radios
+
+### Safety reminders
+- No YOLO/LLM → motors
+- Companion MAVLink read-only unless behind VehicleAdapter + safety supervisor (fail closed)
+- No AI → unrestricted pump; treatment needs `validated_locally` + geofence + arm + freshness
+- Irrigation: ground MQTT only
