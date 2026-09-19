@@ -1,0 +1,18 @@
+Agri-Edge airframe mesh export
+Units: metres in Blender / STL (scale 1.0 = 1 m). Convert to mm in slicer if needed.
+structural = intended build geometry reference
+visual = packaging / clearance ONLY — do not treat as structural solids
+
+file                                          role              bytes  note
+----------------------------------------------------------------------------------------------------
+00_combined_structural.stl                    structural        88884  All structural groups joined (plates, arms, gear, mount)
+00_combined_all_reference.stl                 mixed            231684  Full airframe reference including visual props/avionics
+01_plates_structural.stl                      structural        26084  Top/bottom sandwich plates + corner standoffs
+02_arms_structural.stl                        structural        24884  Four carbon-tube arms (X layout)
+03_landing_gear_structural.stl                structural        20884  Landing gear legs + feet — MUST stay outside camera FOV
+04_camera_mount_structural.stl                structural        17284  Vibration isolators, payload enclosure, camera body
+05_motors_visual.stl                          visual            24884  Motor envelopes for packaging — not structural FEA solids
+06_props_visual.stl                           visual            55284  Prop blades + swept discs for tip-gap / clearance ONLY
+07_avionics_payload_visual.stl                visual            62884  Battery, Pi/Hailo, regulator, rangefinder, env boom — layout
+agri_edge_airframe.glb                        web              303768  glTF binary for browser / CAD viewers
+agri_edge_airframe.blend                      source          1119580  Blender source regenerated from airframe_spec
