@@ -76,12 +76,12 @@ Must **design fully**; build what can ship **without aircraft**. Status + next s
 | # | Surface | Status | Next software deliverable (no aircraft required) |
 |---|---------|--------|--------------------------------------------------|
 | 1 | Marketing site + proof | **Built+tested** (`agri-edge-web`) | Keep site honest: link this checklist / pitch; refresh proof artefacts when models or handoff pack change |
-| 2 | Phone companion `/app` | **UI shell Built** (mock data); protocol **Designed-only** → see [PHONE_PI_CONTRACT.md](PHONE_PI_CONTRACT.md) | Design+implement read-only WebSocket/HTTP client against a **laptop mock Pi** server; heartbeats, GPS, battery, GeoJSON detections, QA flags — **no** arm/mode/mission |
+| 2 | Phone companion `/app` | **UI shell Built** (mock data); protocol **Designed-only** — [PHONE_PI_CONTRACT.md](PHONE_PI_CONTRACT.md) **exists**; live feed not landed | Implement read-only WebSocket/HTTP client against a **laptop mock Pi** server (website PR); heartbeats, GPS, battery, GeoJSON detections, QA flags — **no** arm/mode/mission |
 | 3 | Geo mapping UI | Georeference **Built+tested** in pipeline; farmer map UI **Designed / partial** (dashboard mock) | Wireframes or implemented map mock on site: fields, detection layer, mission footprint, error-budget display |
 | 4 | Weather-adaptive missions | Advisory **Built+tested**; full replan **Designed-only** | Surface go/no-go + advisory in companion app from env/advisory APIs; do **not** pretend closed-loop replan exists |
 | 5 | Emergency phone alerts | **Designed-only** | Spec alert types + push/SMS path in contract doc; implement mock alert feed in app before live LTE |
 | 6 | VR situational view | **Designed-only (Later)** | Out of MVP gate; optional WebXR sketch only if time — not a handoff blocker |
-| 7 | Charging station software | **Designed-only**; mechanic builds hardware Phase 2 | Write dock electrical/software interface note (status, charge state, Pi shutdown handshake) for friend — see Section C |
+| 7 | Charging station software | **Designed-only** (interface note **done**); mechanic builds hardware Phase 2 | [DOCK_INTERFACE.md](DOCK_INTERFACE.md) written; next is bench mock handshake + phone mock `dock` topic — see Section C |
 
 **Section B verdict:** Anwar’s public face (site) is ahead of the operator product (live phone↔Pi, maps, alerts, dock). Closing B.2–B.5 design + mocks is the software work that matters **before** metal, not Hailo HEF polish.
 
@@ -95,8 +95,8 @@ Finish these in **software/docs** before asking the friend to cut carbon / buy m
 |-------|-----------|--------|
 | [x] | Mechanic handoff pack STLs + README | `mechanical/handoff/` exports + README + assignment — **done** |
 | [ ] | `PITCH.md` + `MECHANIC_ASSIGNMENT.md` + `PRODUCT_VISION.md` | Files **exist** under `docs/` and `mechanical/handoff/` as of 19 Sep 2026 — treat this checkbox as **content-complete / reviewed by Anwar**, not “file missing”. Re-read and tick when you sign off. |
-| [ ] | Software API/contracts doc for phone↔Pi (read-only telemetry, alerts) | **Create/finish** [PHONE_PI_CONTRACT.md](PHONE_PI_CONTRACT.md) — this checklist assumes first draft lands with it |
-| [ ] | Charging dock electrical/software interface note for friend | Short note: dock status, charge state, **Pi clean shutdown before power cut**; pin/handshake story — Anwar owns software side of the handshake |
+| [x] | Software API/contracts doc for phone↔Pi (read-only telemetry, alerts) | [PHONE_PI_CONTRACT.md](PHONE_PI_CONTRACT.md) **exists** (designed-only). Live phone link still pending mock Pi feed via website PR — not “implemented”. |
+| [x] | Charging dock electrical/software interface note for friend | [DOCK_INTERFACE.md](DOCK_INTERFACE.md) **done** — status fields, charge state, **Pi clean shutdown before power cut**, topic shape matching phone `dock`, high-level contacts; Anwar owns software handshake |
 | [ ] | Geo map + alert UX wireframes or implemented mocks on site | Dashboard mock is not enough until map + alert flows are visible to a non-coder |
 
 **When Section C is all checked:** friend has geometry + role clarity + interface notes; Anwar has not claimed live telemetry or field-validated treatment. **Then** hand metal.
@@ -121,9 +121,9 @@ Be blunt in pitches: **software MVP for scouting perception is largely built; op
 ## E. Suggested Anwar order (software-only week)
 
 1. Sign off / tick Section C vision+pitch+mechanic docs after one careful read.  
-2. Finish and publish `PHONE_PI_CONTRACT.md`; stand up a mock Pi telemetry server for the phone app.  
+2. ~~Publish `PHONE_PI_CONTRACT.md`~~ **done** (designed-only); stand up a **mock Pi** telemetry server for the phone app (website PR).  
 3. Map + alert UX mocks on `agri-edge-web` (or companion `/app`).  
-4. One-page **dock interface note** for friend (shutdown interlock + status topics).  
+4. ~~Dock interface note~~ **done** — [DOCK_INTERFACE.md](DOCK_INTERFACE.md); next: bench handshake mock.  
 5. Only then: WSL/Docker/Hailo compile path — useful, **not** the metal gate.
 
 ---
