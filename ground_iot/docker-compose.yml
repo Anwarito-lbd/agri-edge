@@ -1,0 +1,37 @@
+# Mosquitto + Node-RED beside agri-edge (ground IoT — not the flight Pi)
+#
+#   docker compose -f ground_iot/docker-compose.yml up -d
+#
+# Do NOT merge Node-RED / Mosquitto source into agri-edge.
+# Irrigation MQTT commands must NEVER be bridged to MAVLink / the aircraft.
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: agriedge-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    restart: unless-stopped
+
+  nodered:
+    image: nodered/node-red:latest
+    container_name: agriedge-nodered
+    ports:
+      - "1880:1880"
+    environment:
+      - TZ=America/Toronto
+    volumes:
+      - nodered_data:/data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  nodered_data:
