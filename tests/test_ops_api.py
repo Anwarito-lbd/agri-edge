@@ -118,7 +118,8 @@ def test_daily_brief_factual():
 
 def test_3d_stub():
     s = scene_stub()
-    assert s["stub"] is True
+    assert s["stub"] is False
+    assert s.get("cesium_ready") is True or "terrain" in s
     assert s["vr_supported"] is False
 
 

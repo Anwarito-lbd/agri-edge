@@ -31,8 +31,10 @@ def test_analytics_stubs():
     seed_demo(store)
     assert "formula" in water_analytics(store)
     assert battery_analytics(store)["items"]
-    assert energy_analytics_stub(store)["stub"] is True
-    assert application_analytics_stub(store)["stub"] is True
+    assert energy_analytics_stub(store)["stub"] is False
+    assert energy_analytics_stub(store)["mission_count"] >= 1
+    assert application_analytics_stub(store)["stub"] is False
+    assert application_analytics_stub(store)["weeds_detected"] >= 1
 
 
 def test_heat_no_auto():

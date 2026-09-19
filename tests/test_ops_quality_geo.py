@@ -39,9 +39,11 @@ def test_vra_constraints():
     rx.cells.append({"lat": 1, "lon": 2, "rate_l_ha": 999})
     result = validate_prescription(rx, wind_ms=10)
     assert result["ok"] is False
-    assert result["auto_apply"] is False
+    assert result.get("auto_apply", result.get("auto_apply")) is False
     fb = feedback_map_stub(rx.prescription_id)
-    assert fb["stub"] is True
+    assert fb["stub"] is False
+    assert fb["commanded"]["type"] == "FeatureCollection"
+    assert len(fb["commanded"]["features"]) >= 1
 
 
 def test_irrigation_no_auto():
