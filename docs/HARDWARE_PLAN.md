@@ -13,23 +13,37 @@ surprising amount of the code is written and waiting on a specific part.
 
 ---
 
-## Stage 0 — Costs nothing, blocks three things
+## Stage 0 — DONE, 20 September 2026
 
-Do this first. It is free and it unblocks work that is otherwise stuck.
+Free, and it unblocked four things that had been stuck since the first session.
 
 | Item | Why | Cost |
 |---|---|---|
-| **WSL2 + Ubuntu 22.04** on the laptop | The Hailo compiler is x86_64 Linux only. Also unblocks ArduPilot SITL, which needs a C++ toolchain this machine does not have. | free, needs admin + reboot |
-| **Docker Desktop** | WebODM and farmOS both run as containers. Their clients are written and tested against stubs; neither has ever met the real server. | free |
-| **Fix the GPU power mode** | Windows → Best performance, NitroSense → Performance, NVIDIA panel → Prefer maximum performance. Retraining is ~18× slower without it. | free |
+| **WSL2 + Ubuntu 22.04** | ✅ **installed** — Ubuntu 22.04.5, x86_64, **Python 3.10.12** (exactly what the Hailo Dataflow Compiler wants), 20 cores, 955 GB free. Toolchain in: gcc, g++, make, cmake, pip, plus ArduPilot's SITL prerequisites. | free |
+| **Docker Desktop** | ⏳ still absent. WebODM and farmOS both run as containers; their clients are written and tested against stubs and neither has met a real server. | free |
+| **Fix the GPU power mode** | ⏳ Windows → Best performance, NitroSense → Performance, NVIDIA panel → Prefer maximum performance. Retraining is ~18× slower without it. | free |
 
-```
-wsl --install -d Ubuntu-22.04      # admin PowerShell, then reboot
-```
+**What installing it actually found.** Both shell scripts in `scripts/` were
+unrunnable on Linux — `core.autocrlf=true` had rewritten them to CRLF, so bash
+read `set -euo pipefail` as `pipefail<CR>`. They had never been executed on
+Linux because there had never been a Linux to execute them on. `.gitattributes`
+now pins LF and two tests assert it.
 
-**What it unblocks:** `scripts/sitl.sh` (real ArduCopter with EKF and failsafes,
-not just the scripted MAVLink emitter), `scripts/hailo_compile.sh`,
-`workstation/webodm_submit.py` against a real WebODM, and the farmOS push.
+**Verified since:** `scripts/hailo_compile.sh --dry-run` passes preflight for
+all three targets (`hailo8l`, `hailo8`, `hailo10h`) inside WSL, against the
+exported `imageweeds_yolox_s.onnx` and 391 calibration images.
+
+**The one step left on the Hailo path** is the Dataflow Compiler wheel itself.
+It is not on PyPI — it sits behind a free account at
+<https://hailo.ai/developer-zone/>, and downloading it needs a sign-in. Then:
+
+```bash
+python3 -m venv ~/hailo-venv
+~/hailo-venv/bin/pip install hailo_dataflow_compiler-*.whl
+~/hailo-venv/bin/pip install -e vendor/hailo_model_zoo
+source ~/hailo-venv/bin/activate
+bash scripts/hailo_compile.sh --arch hailo8     --model models/imageweeds_yolox_s.onnx     --calib data/imageweeds/train/images --classes 5
+```
 
 ---
 
