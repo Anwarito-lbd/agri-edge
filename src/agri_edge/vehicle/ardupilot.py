@@ -60,9 +60,14 @@ class ArduPilotAdapter:
         sitl: bool = True,
         supervisor: SafetySupervisor | None = None,
         simulated_state: VehicleState | None = None,
+        heartbeat_timeout_s: float = 5.0,
     ) -> None:
         self.connection_string = connection_string
         self.sitl = sitl
+        # How long connect() waits for a vehicle before falling back to
+        # simulation. Exposed so tests can prove the no-vehicle path without
+        # spending five seconds per case.
+        self.heartbeat_timeout_s = heartbeat_timeout_s
         self.supervisor = supervisor or SafetySupervisor(allow_commands=False, require_sitl=True)
         self._conn: Any = None
         self._real_link = False
@@ -86,7 +91,9 @@ class ArduPilotAdapter:
         try:
             from agri_edge.telemetry.mavlink_link import MavlinkTelemetry
 
-            link = MavlinkTelemetry(self.connection_string)
+            link = MavlinkTelemetry(
+                self.connection_string, heartbeat_timeout_s=self.heartbeat_timeout_s
+            )
             # Blocks until a heartbeat arrives or the timeout expires; raises if
             # pymavlink is missing or nothing is talking on that endpoint.
             link.start()

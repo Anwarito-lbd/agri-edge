@@ -173,7 +173,27 @@ class MavlinkTelemetry(TelemetrySource):
         self._conn = mavutil.mavlink_connection(
             self._connection_str, source_system=self._source_system
         )
-        self._conn.wait_heartbeat(timeout=self._heartbeat_timeout_s)
+
+        # pymavlink's wait_heartbeat RETURNS None on timeout -- it does not
+        # raise. Ignoring the return value means start() succeeds against a
+        # bound UDP socket with no vehicle on the other end, and every snapshot
+        # afterwards is an empty TelemetrySnapshot: fix_type NONE, lat and lon
+        # None, hdop 99.9. Those are the right values, but "started" then means
+        # nothing, and ArduPilotAdapter.connect() was reporting a link on the
+        # strength of it.
+        #
+        # Started means a vehicle is talking. Anything else raises.
+        heartbeat = self._conn.wait_heartbeat(timeout=self._heartbeat_timeout_s)
+        if heartbeat is None:
+            self._conn.close()
+            self._conn = None
+            raise ConnectionError(
+                f"No MAVLink heartbeat on {self._connection_str} within "
+                f"{self._heartbeat_timeout_s:.0f}s. Nothing is transmitting "
+                "there -- check the autopilot is powered, the radio is linked, "
+                "and the endpoint and baud rate are right."
+            )
+
         self._stop.clear()
         self._thread = threading.Thread(target=self._read_loop, name="mavlink-reader", daemon=True)
         self._thread.start()

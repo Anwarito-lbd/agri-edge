@@ -20,9 +20,13 @@ from agri_edge.vehicle import (
     VehicleState,
 )
 
+# Short, because every case here connects to nothing on purpose, and the
+# default five-second heartbeat wait would make this file take 35 seconds.
+FAST = 0.4
+
 
 def test_default_supervisor_blocks_commands():
-    adapter = ArduPilotAdapter(sitl=True)  # allow_commands defaults False
+    adapter = ArduPilotAdapter(sitl=True, heartbeat_timeout_s=FAST)  # allow_commands defaults False
     # False: nothing is listening. Not an error -- the adapter still works, in
     # simulation -- but it is not a connection and must not claim to be.
     assert adapter.connect() is False
@@ -43,7 +47,7 @@ def test_default_supervisor_blocks_commands():
 
 def test_sitl_simulated_commands_when_explicitly_allowed():
     supervisor = SafetySupervisor(allow_commands=True, require_sitl=True)
-    adapter = ArduPilotAdapter(sitl=True, supervisor=supervisor)
+    adapter = ArduPilotAdapter(sitl=True, supervisor=supervisor, heartbeat_timeout_s=FAST)
     adapter.connect()
     arm = adapter.arm()
     assert arm.ok is True
@@ -60,7 +64,7 @@ def test_sitl_simulated_commands_when_explicitly_allowed():
 
 def test_non_sitl_blocked_even_when_commands_allowed():
     supervisor = SafetySupervisor(allow_commands=True, require_sitl=True)
-    adapter = ArduPilotAdapter(sitl=False, supervisor=supervisor)
+    adapter = ArduPilotAdapter(sitl=False, supervisor=supervisor, heartbeat_timeout_s=FAST)
     adapter.connect()
     result = adapter.arm()
     assert result.ok is False
@@ -80,13 +84,13 @@ def test_adapter_satisfies_protocol():
 
 def test_connect_reports_false_when_no_vehicle_is_listening():
     """The whole finding in one line. A dead UDP port is not a vehicle."""
-    adapter = ArduPilotAdapter("udpin:0.0.0.0:59997", sitl=False)
+    adapter = ArduPilotAdapter("udpin:0.0.0.0:59997", sitl=False, heartbeat_timeout_s=FAST)
     assert adapter.connect() is False
     adapter.close()
 
 
 def test_a_simulated_state_is_never_marked_connected():
-    adapter = ArduPilotAdapter("udpin:0.0.0.0:59996", sitl=True)
+    adapter = ArduPilotAdapter("udpin:0.0.0.0:59996", sitl=True, heartbeat_timeout_s=FAST)
     adapter.connect()
     state = adapter.get_state()
     assert state.connected is False
@@ -101,7 +105,7 @@ def test_a_simulated_state_carries_no_position():
     it would georeference detections against a fabricated origin, and the
     spec's 'uncertain position -> application OFF' rule would never fire
     because the position did not look uncertain."""
-    adapter = ArduPilotAdapter("udpin:0.0.0.0:59995", sitl=True)
+    adapter = ArduPilotAdapter("udpin:0.0.0.0:59995", sitl=True, heartbeat_timeout_s=FAST)
     adapter.connect()
     state = adapter.get_state()
     assert state.lat is None and state.lon is None
@@ -113,7 +117,7 @@ def test_sitl_and_simulated_are_different_things():
     """A SITL flight produces genuine MAVLink from a simulated vehicle. This
     adapter inventing a state because it could not connect is not that, and
     one flag cannot mean both."""
-    adapter = ArduPilotAdapter("udpin:0.0.0.0:59994", sitl=True)
+    adapter = ArduPilotAdapter("udpin:0.0.0.0:59994", sitl=True, heartbeat_timeout_s=FAST)
     adapter.connect()
     state = adapter.get_state()
     assert state.sitl is True and state.simulated is True
