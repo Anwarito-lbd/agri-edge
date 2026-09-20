@@ -11,6 +11,8 @@ import json
 import sys
 from pathlib import Path
 
+import importlib.util
+
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "training"))
@@ -134,6 +136,14 @@ class TestYoloBoxToCoco:
         assert w > 0 and h > 0
 
 
+# Pillow is a laptop-side dep: it writes the synthetic images this class
+# converts. Importing it inside the fixture meant collection SUCCEEDED and every
+# test then errored at setup -- which is why a --collect-only check missed it
+# and CI did not. The guard belongs where it can be seen.
+HAVE_PIL = importlib.util.find_spec("PIL") is not None
+
+
+@pytest.mark.skipif(not HAVE_PIL, reason="Pillow not installed (laptop-only dev dep)")
 class TestConvertSplit:
     """End-to-end conversion on a tiny synthetic dataset."""
 

@@ -68,6 +68,13 @@ test-unit:
 test-integration:
 	$(PYTEST) -q tests/test_integration.py tests/test_mavlink_faults.py
 
+# Reproduce CI's lean runner: a throwaway venv with the runtime core and
+# nothing else. This machine has torch, Pillow and onnxruntime from the
+# training work, so a test that quietly needs one of them passes here and fails
+# there -- which is how CI stayed red for four commits without anyone noticing.
+test-lean:
+	$(PYTHON) scripts/lean_runner_check.py
+
 test-ops:
 	$(PYTEST) -q tests/test_ops_*.py
 

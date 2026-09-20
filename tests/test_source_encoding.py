@@ -39,7 +39,16 @@ TEXT_SUFFIXES = {".py", ".yaml", ".yml", ".json", ".md", ".sh", ".toml",
 
 
 def _in_scope(path: Path) -> bool:
-    return not (SKIP_PARTS & set(path.relative_to(ROOT).parts))
+    parts = path.relative_to(ROOT).parts
+    if SKIP_PARTS & set(parts):
+        return False
+    # Any virtualenv, whatever it is called. A list of known names missed a
+    # throwaway `.lean-venv` and this suite silently grew from 1128 tests to
+    # 3665 by linting site-packages -- which is a scope bug, not more coverage.
+    for i in range(1, len(parts)):
+        if (ROOT.joinpath(*parts[:i]) / "pyvenv.cfg").exists():
+            return False
+    return True
 
 
 def text_files() -> list[Path]:

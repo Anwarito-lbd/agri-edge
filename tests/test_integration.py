@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 
 import numpy as np
+import importlib.util
+
 import pytest
 
 from agri_edge.config import Config, QAConfig
@@ -26,9 +28,19 @@ MODEL_CANDIDATES = [
 ]
 MODEL = next((p for p in MODEL_CANDIDATES if p.exists()), None)
 
+# Pillow reads the dataset images this file feeds through the pipeline. It is
+# a laptop-side dependency, so the guard needs both: a machine with a model but
+# without Pillow -- a clean venv holding only the runtime core -- produced eight
+# failures that looked like pipeline bugs and were a missing image library.
+HAVE_PIL = importlib.util.find_spec("PIL") is not None
+
 pytestmark = pytest.mark.skipif(
-    MODEL is None,
-    reason="no exported ONNX model (run training/export_onnx.py)",
+    MODEL is None or not HAVE_PIL,
+    reason=(
+        "no exported ONNX model (run training/export_onnx.py)"
+        if MODEL is None
+        else "Pillow not installed (laptop-only dev dep)"
+    ),
 )
 
 

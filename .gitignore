@@ -38,3 +38,4 @@ build/
 # demand from mechanical/handoff/ when you need to hand something over.
 *.tgz
 *.tar.gz
+.lean-venv/
