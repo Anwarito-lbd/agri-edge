@@ -11,7 +11,6 @@ from agri_edge.ops.notifications import DashboardNotificationProvider
 from agri_edge.ops.odm import ODMPipelineStub
 from agri_edge.ops.reports import daily_brief
 from agri_edge.ops.map3d import scene_stub
-from agri_edge.ops.types import Alert
 
 
 class _W:

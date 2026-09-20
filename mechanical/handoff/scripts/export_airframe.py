@@ -284,7 +284,7 @@ def main(argv: list[str]) -> None:
 
     # Combined structural-only STL
     structural_objs = []
-    for key, meta in PART_GROUPS.items():
+    for _key, meta in PART_GROUPS.items():
         if meta["role"] != "structural":
             continue
         structural_objs.extend([o for o in meshes if meta["match"](o.name)])

@@ -21,3 +21,14 @@ YOLOX_outputs_crashed/
 models/*.onnx
 models/*.hef
 models/*.pth
+
+# Secrets. .env.example IS tracked and documents every variable; .env is not.
+.env
+.env.*
+!.env.example
+
+# Build and tool caches
+dist/
+build/
+.ruff_cache/
+.mypy_cache/

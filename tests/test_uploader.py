@@ -8,7 +8,6 @@ The failure paths matter as much as the happy one: on an aircraft, "the network
 is absent" is the normal state, not an exception.
 """
 
-import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 

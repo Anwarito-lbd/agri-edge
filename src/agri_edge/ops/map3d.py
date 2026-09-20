@@ -1,7 +1,7 @@
 """3D scene API + optional VR status (§115–116, §159) — Cesium-ready JSON, no real VR."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
 def scene(farm_id: str = "demo_farm", store: Any = None) -> dict[str, Any]:

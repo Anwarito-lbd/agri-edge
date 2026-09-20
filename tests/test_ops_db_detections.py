@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from agri_edge.ops.db import DetectionStore, SensorReadingStore, get_detection_db, reset_sensor_db

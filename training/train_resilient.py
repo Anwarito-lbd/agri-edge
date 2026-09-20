@@ -176,7 +176,7 @@ def main() -> int:
         ep = last_epoch(args.exp)
         progress = f"{ep[0]}/{ep[1]}" if ep else "unknown"
         print(f"\nTransient GPU fault ({pattern}) at epoch {progress}.")
-        print(f"Checkpointed each epoch, so at most one epoch is lost.")
+        print("Checkpointed each epoch, so at most one epoch is lost.")
         print(f"Cooling down {args.cooldown_s:.0f}s, then resuming...", flush=True)
         time.sleep(args.cooldown_s)
 

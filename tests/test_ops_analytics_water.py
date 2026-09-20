@@ -1,6 +1,6 @@
 """Water models, analytics, schema coverage."""
 from agri_edge.ops.schema import WaterSource, Tank, Pump, Valve, FlowMeter, WaterReading, WaterUsageEvent, GreenhouseZone
-from agri_edge.ops.types import DataOrigin, QualityFlag, new_id, utcnow
+from agri_edge.ops.types import QualityFlag, new_id, utcnow
 from agri_edge.ops.store import reset_store
 from agri_edge.ops.simulate import seed_demo
 from agri_edge.ops.analytics import water_analytics, battery_analytics, energy_analytics_stub, application_analytics_stub

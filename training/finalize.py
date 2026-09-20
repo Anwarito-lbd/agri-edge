@@ -70,8 +70,8 @@ def update_card(card: Path, metrics: dict, checkpoint_note: str) -> None:
     table = "\n".join(
         [
             f"*Measured {stamp} on the held-out **test** split, via `training/evaluate.py`,",
-            f"running inference through the deployed `OnnxEngine`.*",
-            f"",
+            "running inference through the deployed `OnnxEngine`.*",
+            "",
             f"*Checkpoint: {checkpoint_note}*",
             "",
             "| Class | AP@.50:.95 | AP@.50 | GT boxes |",

@@ -284,7 +284,6 @@ class TestBuild:
 
 class TestPipelineIntegration:
     def test_environment_lands_in_the_sidecar(self, tmp_path):
-        import numpy as np
 
         from agri_edge.capture.camera import SimulatedCamera
         from agri_edge.config import Config, QAConfig

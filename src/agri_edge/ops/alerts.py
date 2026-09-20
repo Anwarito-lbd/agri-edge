@@ -1,7 +1,7 @@
 """Alert engine: rules, severities, categories, dedupe, ACK/RESOLVE/ESCALATE (§83, §93–99)."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from .types import (

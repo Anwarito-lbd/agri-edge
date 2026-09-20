@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from .schema import MapAsset
-from .types import new_id
 
 
 def feature(geom: dict[str, Any], properties: dict[str, Any], fid: Optional[str] = None) -> dict[str, Any]:

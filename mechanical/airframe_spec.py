@@ -663,7 +663,8 @@ def summary(af: Airframe | None = None, mass: MassBudget | None = None) -> dict:
         "legs": af.leg_clearance(),
         "vibration": af.vibration(),
         "checks": [
-            {"label": l, "pass": p, "detail": d} for l, p, d in af.checks(mass)
+            {"label": label, "pass": ok, "detail": detail}
+            for label, ok, detail in af.checks(mass)
         ],
     }
 

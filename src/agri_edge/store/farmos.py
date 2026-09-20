@@ -50,7 +50,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any
 
-from .spool import Spool, SpoolEntry
+from .spool import Spool
 
 log = logging.getLogger("agri_edge.store.farmos")
 

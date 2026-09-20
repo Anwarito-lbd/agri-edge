@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from typing import Any, Optional
-from .types import DeviceType, DataOrigin, QualityFlag, new_id, utcnow
+from .types import DataOrigin, QualityFlag
 
 
 @dataclass

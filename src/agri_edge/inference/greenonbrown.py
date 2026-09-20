@@ -205,7 +205,7 @@ def _label_numpy(mask: np.ndarray, max_iterations: int = 512) -> tuple[np.ndarra
     ids = np.arange(1, mask.size + 1, dtype=np.int64).reshape(mask.shape)
     lab = np.where(mask > 0, ids, 0)
 
-    for n in range(max_iterations):
+    for _ in range(max_iterations):
         prev = lab
         m = lab
         acc = m.copy()

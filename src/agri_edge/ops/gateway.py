@@ -5,7 +5,7 @@ gateway buffers when uplink is down and syncs with idempotent keys.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Any, Optional
 
 from .types import new_id, utcnow

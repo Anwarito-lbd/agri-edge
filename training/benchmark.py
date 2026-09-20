@@ -171,16 +171,16 @@ def main() -> int:
     if max_speed > TYPICAL_SURVEY_SPEED * 2:
         print()
         print(f"  Inference is NOT the binding constraint at {args.altitude:.0f} m AGL: the limit above")
-        print(f"  is far beyond survey speeds (typically 5-15 m/s). Airframe endurance,")
-        print(f"  battery and ground-sampling distance will decide the mission instead.")
+        print("  is far beyond survey speeds (typically 5-15 m/s). Airframe endurance,")
+        print("  battery and ground-sampling distance will decide the mission instead.")
         print(f"  At a realistic {TYPICAL_SURVEY_SPEED:.0f} m/s you could fly as low as "
               f"{TYPICAL_SURVEY_SPEED * safe_interval / (1 - args.overlap) * (w / h) / (SENSOR_WIDTH_MM / FOCAL_LENGTH_MM):.1f} m AGL")
         print(f"  and still hold {args.overlap:.0%} overlap.")
     elif max_speed < 3.0:
         print()
         print(f"  WARNING: {max_speed:.1f} m/s is slower than most survey flights. Inference")
-        print(f"  is the bottleneck -- use the Hailo backend, raise the altitude, or")
-        print(f"  accept less overlap before planning a mission around this.")
+        print("  is the bottleneck -- use the Hailo backend, raise the altitude, or")
+        print("  accept less overlap before planning a mission around this.")
 
     if args.backend == "onnx":
         print()

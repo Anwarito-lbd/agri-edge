@@ -12,7 +12,6 @@ from agri_edge.pipeline.runner import Pipeline
 from agri_edge.store.spool import Priority, Spool
 from agri_edge.telemetry.mavlink_link import (
     GPS_FIX_3D,
-    GPS_FIX_RTK_FIXED,
     MavlinkTelemetry,
     SimulatedTelemetry,
     TelemetrySnapshot,

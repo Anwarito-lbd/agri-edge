@@ -28,7 +28,6 @@ returns 2xx. A crash mid-upload re-sends rather than loses.
 
 from __future__ import annotations
 
-import json
 import logging
 import mimetypes
 import time
@@ -36,7 +35,6 @@ import urllib.error
 import urllib.request
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from .spool import Spool, SpoolEntry
 

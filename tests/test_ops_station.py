@@ -4,8 +4,8 @@ from __future__ import annotations
 from agri_edge.ops.store import reset_store
 from agri_edge.ops.simulate import seed_demo
 from agri_edge.ops.types import DeviceType, TempKind, TypedTemperature, DataOrigin, QualityFlag
-from agri_edge.ops.derived import dewpoint_c, vpd_kpa, gdd_stub, frost_risk, derive_from_weather
-from agri_edge.ops.quality import evaluate_soil_reading, evaluate_weather_reading
+from agri_edge.ops.derived import dewpoint_c, vpd_kpa, gdd_stub, frost_risk
+from agri_edge.ops.quality import evaluate_soil_reading
 from agri_edge.ops.alerts import AlertEngine
 from agri_edge.ops.types import AlertSeverity, AlertState
 

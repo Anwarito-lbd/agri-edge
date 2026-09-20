@@ -32,3 +32,41 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+# The Pi runtime targets Raspberry Pi OS Bookworm, which ships Python 3.11.
+target-version = "py311"
+line-length = 100
+extend-exclude = ["vendor", "YOLOX_outputs", "YOLOX_outputs_crashed", "runs", "data"]
+
+[tool.ruff.lint]
+# Chosen to catch BUGS, not to reformat the tree.
+#
+# F is the reason this config exists. F821 (undefined-name) found nine POST
+# handlers pasted inside do_GET, where `body` is not bound -- the variable-rate
+# approval endpoint returned 500 on GET and 404 on POST, and no test noticed
+# because none of them spoke HTTP. A linter that is never run finds nothing.
+#
+# Deliberately NOT enabled: UP045/UP037 (Optional[x] vs x | None) and most of
+# the style families. 127 of the 356 findings on first run were that single
+# stylistic preference, and burying a real undefined-name under 127 of those is
+# how a lint gate gets switched off.
+select = [
+    "E4", "E7", "E9",  # pycodestyle errors that are not whitespace opinions
+    "F",               # pyflakes: undefined names, unused imports and variables
+    "B",               # bugbear: mutable defaults, shadowed loop vars, B017
+    "S102", "S307",    # exec / eval
+    "T100",            # a forgotten breakpoint()
+    "PLE",             # pylint errors
+]
+ignore = [
+    "B008",  # function call in a default argument -- deliberate in a few dataclasses
+    "B905",  # zip() without strict= -- 3.11 has it but the runtime code predates it
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert on behaviour, including the broad-exception cases they exercise.
+"tests/*" = ["B017", "F841"]
+# Blender's bpy is only importable inside Blender, so this module is not
+# analysable the way the rest of the tree is.
+"mechanical/blender_airframe.py" = ["F821"]

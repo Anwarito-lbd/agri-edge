@@ -8,7 +8,7 @@ from pathlib import Path
 from agri_edge.ops.store import reset_store
 from agri_edge.ops.simulate import seed_demo
 from agri_edge.ops.geo import build_microclimate_grid, default_map_assets
-from agri_edge.ops.vra import make_demo_prescription, validate_prescription, approve_prescription, list_cells, feedback_maps
+from agri_edge.ops.vra import make_demo_prescription, approve_prescription, list_cells, feedback_maps
 from agri_edge.ops.odm import ODMPipelineStub
 from agri_edge.ops.map3d import scene, vr_status
 from agri_edge.ops.analytics import battery_analytics, energy_analytics, water_analytics, application_analytics

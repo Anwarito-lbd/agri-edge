@@ -42,7 +42,6 @@ import json
 import shutil
 import sys
 import zipfile
-from collections import Counter
 from pathlib import Path
 
 REPO_ID = "keremberke/aerial-sheep-object-detection"

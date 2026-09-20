@@ -41,7 +41,6 @@ class ModelRecord:
     @classmethod
     def from_meta_json(cls, path: Path, *, compute_sha256: bool = False) -> "ModelRecord":
         raw = json.loads(path.read_text(encoding="utf-8"))
-        stem = path.name
         # e.g. weed_crop_yolox_s.onnx.meta.json
         artifact = path.parent / path.name.replace(".meta.json", "").replace(".onnx.meta.json", ".onnx")
         if not artifact.exists():

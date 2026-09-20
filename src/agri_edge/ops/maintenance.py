@@ -1,11 +1,11 @@
 """Maintenance engine + alerts (§128–129)."""
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from .types import AlertCategory, AlertSeverity, CalibrationRecord, new_id, utcnow
+from .types import AlertCategory, AlertSeverity, CalibrationRecord, utcnow
 from .alerts import AlertEngine
 
 

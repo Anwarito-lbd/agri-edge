@@ -9,7 +9,6 @@ from .types import (
     DataOrigin,
     Device,
     DeviceType,
-    QualityFlag,
     SoilObservation,
     TempKind,
     TypedTemperature,
