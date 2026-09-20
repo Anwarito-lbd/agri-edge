@@ -128,13 +128,20 @@ jobs:
       - name: Confirm the optional tests are actually running
         # A skip here is indistinguishable from a pass in the summary line, so
         # assert the count instead of trusting the tick.
+        #
+        # test_webodm.py is on this list because it importorskips Pillow. That
+        # skip is correct in the lean job and would be a silent regression here,
+        # which is exactly the shape of bug this step exists to catch.
         run: |
-          pytest tests/test_mavlink_faults.py -q --no-header -rN | tee /tmp/mav.txt
-          grep -qE "[0-9]+ passed" /tmp/mav.txt
-          if grep -q "no tests ran\|skipped" /tmp/mav.txt; then
-            echo "MAVLink fault tests skipped -- pymavlink did not install."
-            exit 1
-          fi
+          for f in tests/test_mavlink_faults.py tests/test_webodm.py; do
+            echo "--- $f"
+            pytest "$f" -q --no-header -rN | tee /tmp/opt.txt
+            grep -qE "[0-9]+ passed" /tmp/opt.txt
+            if grep -qE "no tests ran|skipped" /tmp/opt.txt; then
+              echo "$f skipped -- its optional dependency did not install."
+              exit 1
+            fi
+          done
 
       - name: Run the suite
         run: pytest -q

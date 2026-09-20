@@ -20,6 +20,19 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+# Pillow writes the GPS EXIF these tests are about, and webodm_submit imports
+# it at module level. Without this the whole file fails at COLLECTION on a
+# runner that has only the runtime installed -- which reads as a test failure,
+# not a missing optional dependency, and kept CI red for days.
+#
+# This is a genuine skip, not a hidden one: the CI `extras` job installs pillow
+# and asserts these tests actually ran, for the same reason it does for the
+# MAVLink fault matrix.
+pytest.importorskip(
+    "PIL",
+    reason="Pillow is the `webodm` path's dependency; install with pip install pillow",
+)
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "workstation"))
 
 from webodm_submit import (  # noqa: E402

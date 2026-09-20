@@ -34,8 +34,14 @@ import json
 import sys
 from pathlib import Path
 
-import torch
-from torch import nn
+# torch is NOT imported here. `build_meta` and DATASET_PROVENANCE are pure
+# metadata helpers -- the provenance record of what a model was trained on --
+# and tests/test_provenance.py needs them without an 800 MB training stack.
+#
+# A module-level `import torch` made that test unimportable on a runner with
+# only the runtime installed, so CI failed at COLLECTION, which reads as a test
+# failure rather than a missing optional dependency. It had been red for days.
+# torch is imported inside main(), where it is actually used.
 
 
 # Per-dataset provenance, keyed on the experiment's `data_dir` basename.
@@ -146,6 +152,8 @@ def main() -> int:
     ap.add_argument("--class-names", type=str, default="crop,weed")
     args = ap.parse_args()
 
+    import torch
+    from torch import nn
     from yolox.exp import get_exp
     from yolox.models.network_blocks import SiLU
     from yolox.utils import replace_module
