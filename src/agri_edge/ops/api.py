@@ -9,7 +9,7 @@ import json
 import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .store import get_store, reset_store, OpsStore
@@ -18,15 +18,15 @@ from .geo import demo_farm_geojson, TIME_RANGES, filter_by_time_range
 from .derived import derive_from_weather, gdd_stub
 from .irrigation import irrigation_dashboard, rule_based_irrigation
 from .vra import make_demo_prescription, validate_prescription, feedback_map_stub, approve_prescription, list_cells
-from .analytics import battery_analytics, energy_analytics, energy_analytics_stub, water_analytics, application_analytics, application_analytics_stub, kpi_page
+from .analytics import battery_analytics, energy_analytics, water_analytics, application_analytics, kpi_page
 from .maintenance import check_calibration_due, default_schedules
 from .gateway import OfflineGateway, TRANSPORT_NOTE
 from .reports import daily_brief, report_summary, build_timeline
 from .commands import confirm_command
 from .odm import ODMPipelineStub
-from .map3d import scene_stub, scene, vr_status
+from .map3d import scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
-from .types import AlertState, DataOrigin, utcnow, new_id
+from .types import AlertState, utcnow, new_id
 
 UI_DIR = Path(__file__).parent / "ui"
 HOST = "127.0.0.1"
@@ -265,43 +265,6 @@ class OpsHandler(BaseHTTPRequestHandler):
                 return _json(self, 200, {**_banner(store), "items": [c.to_dict() for c in store.notes]})
             if path == "/api/ops/mapfield":
                 return _json(self, 200, {**_banner(store), "workflows": [w.to_dict() for w in _odm.workflows.values()]})
-
-            
-            if path == "/api/ops/vra/approve":
-                wind = body.get("wind_ms")
-                result = approve_prescription(_rx, actor=body.get("actor", "operator"), wind_ms=wind)
-                store.add_audit(body.get("actor", "operator"), "vra_approve", _rx.prescription_id, str(result.get("approved")))
-                return _json(self, 200, {**_banner(store), **result, "prescription": _rx.to_dict()})
-            if path == "/api/ops/mapfield/create":
-                wf = _odm.create_workflow(body.get("field_id", "field_north"), sensor=body.get("sensor", "rgb"), gsd_cm=float(body.get("gsd_cm", 2.5)))
-                return _json(self, 201, {**_banner(store), "workflow": wf.to_dict()})
-            if path == "/api/ops/mapfield/validate":
-                return _json(self, 200, {**_banner(store), **_odm.validate_workflow(body["workflow_id"])})
-            if path == "/api/ops/mapfield/approve":
-                return _json(self, 200, {**_banner(store), **_odm.approve_workflow(body["workflow_id"], actor=body.get("actor", "operator"))})
-            if path == "/api/ops/mapfield/execute":
-                return _json(self, 202, {**_banner(store), **_odm.execute_workflow(body["workflow_id"], store=store)})
-            if path == "/api/ops/cameras":
-                from .schema import CameraEvent
-                ev = CameraEvent(event_id=new_id("cam_"), camera_id=body.get("camera_id", "cam1"), ts=utcnow().isoformat(), label=body.get("label", "note"), confidence=float(body.get("confidence", 0.5)), image_path=body.get("image_path"), synthetic=True)
-                store.cameras.append(ev)
-                return _json(self, 201, ev.to_dict())
-            if path == "/api/ops/scouts":
-                from .schema import ScoutReport
-                ev = ScoutReport(report_id=new_id("sc_"), ts=utcnow().isoformat(), scout_id=body.get("scout_id", "scout"), notes=body.get("notes", ""), zone_id=body.get("zone_id"), synthetic=True)
-                store.scouts.append(ev)
-                return _json(self, 201, ev.to_dict())
-            if path == "/api/ops/manual":
-                from .schema import ManualObservation
-                ev = ManualObservation(obs_id=new_id("mo_"), ts=utcnow().isoformat(), observer=body.get("observer", "operator"), text=body.get("text", ""), category=body.get("category", "general"), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
-                store.manual.append(ev)
-                return _json(self, 201, ev.to_dict())
-            if path == "/api/ops/notes":
-                from .schema import MobileNote
-                ev = MobileNote(note_id=new_id("mn_"), ts=utcnow().isoformat(), author=body.get("author", "operator"), text=body.get("text", ""), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
-                store.notes.append(ev)
-                return _json(self, 201, ev.to_dict())
-
             return _json(self, 404, {"error": "not found", "path": path})
         except Exception as exc:  # noqa: BLE001
             return _json(self, 500, {"error": str(exc)})
@@ -319,7 +282,6 @@ class OpsHandler(BaseHTTPRequestHandler):
 
         try:
             if path == "/api/ops/detections":
-                from .db import get_detection_db
                 row = dict(body)
                 row.setdefault("detection_id", body.get("detection_id") or body.get("id") or f"det_{len(getattr(store, 'detections', []))+1:05d}")
                 row.setdefault("ts", body.get("ts") or __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat().replace("+00:00", "Z"))
@@ -377,6 +339,51 @@ class OpsHandler(BaseHTTPRequestHandler):
                     frost_level=body.get("frost_level", "none"),
                 )
                 return _json(self, 200, rec.to_dict())
+
+            # These nine routes lived inside do_GET until 19 Sept 2026, where
+            # `body` does not exist. GET returned 500 NameError and POST
+            # returned 404, so the prescription-approval endpoint -- the
+            # human-in-the-loop gate the spec requires before any variable-rate
+            # application -- could not be called at all, and neither could the
+            # mapping workflow or the manual-observation ingestion.
+            #
+            # Found by ruff F821 (undefined-name), which is why `make lint`
+            # silently exiting 0 when ruff was absent mattered.
+            if path == "/api/ops/vra/approve":
+                wind = body.get("wind_ms")
+                result = approve_prescription(_rx, actor=body.get("actor", "operator"), wind_ms=wind)
+                store.add_audit(body.get("actor", "operator"), "vra_approve", _rx.prescription_id, str(result.get("approved")))
+                return _json(self, 200, {**_banner(store), **result, "prescription": _rx.to_dict()})
+            if path == "/api/ops/mapfield/create":
+                wf = _odm.create_workflow(body.get("field_id", "field_north"), sensor=body.get("sensor", "rgb"), gsd_cm=float(body.get("gsd_cm", 2.5)))
+                return _json(self, 201, {**_banner(store), "workflow": wf.to_dict()})
+            if path == "/api/ops/mapfield/validate":
+                return _json(self, 200, {**_banner(store), **_odm.validate_workflow(body["workflow_id"])})
+            if path == "/api/ops/mapfield/approve":
+                return _json(self, 200, {**_banner(store), **_odm.approve_workflow(body["workflow_id"], actor=body.get("actor", "operator"))})
+            if path == "/api/ops/mapfield/execute":
+                return _json(self, 202, {**_banner(store), **_odm.execute_workflow(body["workflow_id"], store=store)})
+            if path == "/api/ops/cameras":
+                from .schema import CameraEvent
+                ev = CameraEvent(event_id=new_id("cam_"), camera_id=body.get("camera_id", "cam1"), ts=utcnow().isoformat(), label=body.get("label", "note"), confidence=float(body.get("confidence", 0.5)), image_path=body.get("image_path"), synthetic=True)
+                store.cameras.append(ev)
+                return _json(self, 201, ev.to_dict())
+            if path == "/api/ops/scouts":
+                from .schema import ScoutReport
+                ev = ScoutReport(report_id=new_id("sc_"), ts=utcnow().isoformat(), scout_id=body.get("scout_id", "scout"), notes=body.get("notes", ""), zone_id=body.get("zone_id"), synthetic=True)
+                store.scouts.append(ev)
+                return _json(self, 201, ev.to_dict())
+            if path == "/api/ops/manual":
+                from .schema import ManualObservation
+                ev = ManualObservation(obs_id=new_id("mo_"), ts=utcnow().isoformat(), observer=body.get("observer", "operator"), text=body.get("text", ""), category=body.get("category", "general"), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
+                store.manual.append(ev)
+                return _json(self, 201, ev.to_dict())
+            if path == "/api/ops/notes":
+                from .schema import MobileNote
+                ev = MobileNote(note_id=new_id("mn_"), ts=utcnow().isoformat(), author=body.get("author", "operator"), text=body.get("text", ""), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
+                store.notes.append(ev)
+                return _json(self, 201, ev.to_dict())
+
             return _json(self, 404, {"error": "not found", "path": path})
         except KeyError as exc:
             return _json(self, 404, {"error": str(exc)})
