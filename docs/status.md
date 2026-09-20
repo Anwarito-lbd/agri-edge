@@ -1,6 +1,6 @@
 # Capability status
 
-**Updated:** 2026-09-19 (America/Toronto) — master priorities 3–10 advanced in software.
+**Updated:** 2026-09-20 (America/Toronto) — verification audit of both repos; see docs/audit-2026-09-19.md. CI is green on agri-edge and agri-edge-web.
 
 **Legend:** Code = implemented in repo · Sim = works in sim/tests · Hardware = run on real device · Field = farm-validated  
 Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
@@ -37,6 +37,11 @@ Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
 | CI (Makefile + GHA pytest) | ✅ | ✅ | N/A | N/A |
 | third_party/manifest.yaml | ✅ | N/A | N/A | N/A |
 | `validated_locally` | flag false | N/A | ⏳ | ❌ |
+| Airframe spec + Blender model | ✅ | ✅ | N/A | N/A |
+| agri-edge-web tests + CI | ✅ | ✅ | N/A | N/A |
+| Ops proxy write policy (fail closed) | ✅ | ✅ | N/A | N/A |
+| Lean-runner check (`make test-lean`) | ✅ | ✅ | N/A | N/A |
+| Hailo compile `--dry-run` | ✅ | ✅ | ❌ BLOCKED no WSL2 | ❌ |
 
 Do not mark Hardware/Field green without evidence.
 
