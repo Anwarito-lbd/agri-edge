@@ -370,19 +370,19 @@ class OpsHandler(BaseHTTPRequestHandler):
                 return _json(self, 201, ev.to_dict())
             if path == "/api/ops/scouts":
                 from .schema import ScoutReport
-                ev = ScoutReport(report_id=new_id("sc_"), ts=utcnow().isoformat(), scout_id=body.get("scout_id", "scout"), notes=body.get("notes", ""), zone_id=body.get("zone_id"), synthetic=True)
-                store.scouts.append(ev)
-                return _json(self, 201, ev.to_dict())
+                report = ScoutReport(report_id=new_id("sc_"), ts=utcnow().isoformat(), scout_id=body.get("scout_id", "scout"), notes=body.get("notes", ""), zone_id=body.get("zone_id"), synthetic=True)
+                store.scouts.append(report)
+                return _json(self, 201, report.to_dict())
             if path == "/api/ops/manual":
                 from .schema import ManualObservation
-                ev = ManualObservation(obs_id=new_id("mo_"), ts=utcnow().isoformat(), observer=body.get("observer", "operator"), text=body.get("text", ""), category=body.get("category", "general"), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
-                store.manual.append(ev)
-                return _json(self, 201, ev.to_dict())
+                obs = ManualObservation(obs_id=new_id("mo_"), ts=utcnow().isoformat(), observer=body.get("observer", "operator"), text=body.get("text", ""), category=body.get("category", "general"), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
+                store.manual.append(obs)
+                return _json(self, 201, obs.to_dict())
             if path == "/api/ops/notes":
                 from .schema import MobileNote
-                ev = MobileNote(note_id=new_id("mn_"), ts=utcnow().isoformat(), author=body.get("author", "operator"), text=body.get("text", ""), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
-                store.notes.append(ev)
-                return _json(self, 201, ev.to_dict())
+                note = MobileNote(note_id=new_id("mn_"), ts=utcnow().isoformat(), author=body.get("author", "operator"), text=body.get("text", ""), lat=body.get("lat"), lon=body.get("lon"), synthetic=True)
+                store.notes.append(note)
+                return _json(self, 201, note.to_dict())
 
             return _json(self, 404, {"error": "not found", "path": path})
         except KeyError as exc:

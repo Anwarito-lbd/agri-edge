@@ -13,6 +13,8 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
+from typing import Any
+
 import numpy as np
 
 from ..telemetry.mavlink_link import TelemetrySnapshot
@@ -195,7 +197,9 @@ class Picamera2Camera(Camera):
         # hundreds of milliseconds -- fine for a survey grid, far too slow for
         # continuous detection.
         self.video_mode = video_mode
-        self._cam = None
+        # Any, not Picamera2: the library is an optional extra and only
+        # exists on the Pi, so the annotation cannot name it.
+        self._cam: Any = None
         self._seq = 0
 
     def start(self) -> None:  # pragma: no cover - requires hardware

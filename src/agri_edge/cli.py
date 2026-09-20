@@ -145,9 +145,9 @@ def cmd_spool(args) -> int:
         pending = len(spool.pending())
         print(f"Pushing {pending} pending sidecars to farmOS at {cfg.farmos.url}")
         print("  sidecars only -- images stay spooled for the workstation.")
-        result = push_spool(spool, fcfg, limit=args.limit_uploads)
-        print(json.dumps(result.as_dict(), indent=2))
-        return 0 if result.failed == 0 else 1
+        farm_result = push_spool(spool, fcfg, limit=args.limit_uploads)
+        print(json.dumps(farm_result.as_dict(), indent=2))
+        return 0 if farm_result.failed == 0 else 1
 
     if args.upload:
         from .store.uploader import build_uploader

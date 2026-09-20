@@ -24,7 +24,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, replace
-from typing import Optional
+from typing import Any, Optional
 
 # MAVLink GPS_FIX_TYPE values we care about.
 GPS_FIX_NONE = 0
@@ -155,7 +155,11 @@ class MavlinkTelemetry(TelemetrySource):
         self._connection_str = connection
         self._source_system = source_system
         self._heartbeat_timeout_s = heartbeat_timeout_s
-        self._conn = None
+        # Any, not a pymavlink type: pymavlink is an optional extra, so the
+        # annotation cannot name a class that may not be installed. Left
+        # unannotated it inferred as None and every use of it was a mypy
+        # error.
+        self._conn: Any = None
         self._snapshot = TelemetrySnapshot()
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None

@@ -81,24 +81,31 @@ jobs:
         run: ruff format --check src tests training workstation mechanical scripts
         continue-on-error: true   # advisory until the tree is formatted once
 
-      # A ratchet, not a gate and not a shrug. All 24 current errors were read
-      # individually and every one is a type-NARROWING limitation, not a
-      # defect: handles typed Optional and guarded by a runtime check mypy
-      # cannot follow (`if self.has_position:`), a dict of callables, numpy
-      # list-vs-ndarray, and one variable name reused across mutually exclusive
-      # branches that each return.
+      # A ratchet, not a gate and not a shrug. Every remaining error was read
+      # individually and none is a defect -- each is a type-NARROWING
+      # limitation: a value guarded by a runtime check mypy cannot follow
+      # (`if self.has_position:`), a dict of callables, numpy list-vs-ndarray.
       #
-      # So failing the build on them would be noise. Letting the number drift
-      # upward would lose the next real one in the crowd. The count is pinned:
-      # it may fall, never rise.
+      # Failing the build on those would be noise. Letting the number drift
+      # upward would lose the next real one in the crowd. So it is pinned: it
+      # may fall, never rise.
+      #
+      # It earned its place on its first run. The heartbeat fix in
+      # telemetry/mavlink_link.py pushed the count 24 -> 25 and CI caught it.
+      # The right response was not a higher ceiling: `self._conn` was inferred
+      # as None because it had no annotation, and typing it `Any` -- pymavlink
+      # is an optional extra, so the annotation cannot name its class -- fixed
+      # four errors at once. The same shape in capture/camera.py made five.
+      # Renaming a variable that was reused for three different types across
+      # branches that each return took it to 11.
       - name: make typecheck (ratchet)
         run: |
           set +e
           make typecheck | tee /tmp/mypy.txt
           set -e
           found=$(grep -oE "Found [0-9]+ error" /tmp/mypy.txt | grep -oE "[0-9]+" || echo 0)
-          echo "mypy errors: $found (ceiling 24)"
-          if [ "$found" -gt 24 ]; then
+          echo "mypy errors: $found (ceiling 11)"
+          if [ "$found" -gt 11 ]; then
             echo "New type errors. Fix them, or justify a higher ceiling here."
             exit 1
           fi
