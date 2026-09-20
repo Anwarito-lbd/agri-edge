@@ -49,12 +49,51 @@ SPEEDUP="${SPEEDUP:-1}"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
+# Checked before anything else touches the tree, because the error waf produces
+# is about python3 and says nothing about line endings.
+crlf_guard() {
+    [ -f "${ARDUPILOT}/waf" ] || return 0
+    # The carriage return is matched by code, not written as a literal. A
+    # literal CR is exactly the byte an editor, a heredoc or a checkout quietly
+    # rewrites, which would leave this guard silently matching nothing -- the
+    # failure mode it exists to prevent.
+    CR=$(printf '\r')
+    if head -1 "${ARDUPILOT}/waf" | grep -q "$CR"; then
+        fail "vendor/ardupilot has CRLF line endings and will not build on Linux.
+
+Its shebang is read as '#!/usr/bin/env python3<CR>', so env looks for a program
+literally named 'python3<CR>':
+
+    /usr/bin/env: 'python3\r': No such file or directory
+
+This happens when the tree is cloned on Windows, where core.autocrlf=true is
+the default. vendor/ is a separate clone, so this repository's .gitattributes
+cannot reach it. 21,822 of ArduPilot's files were affected here.
+
+Fix the existing tree, from inside it:
+    grep -rlI \"\$(printf '\\r')\" . | xargs sed -i 's/\r\$//'
+
+Or re-clone with --config core.autocrlf=false (see the top of this script)."
+    fi
+}
+
 [ -d "${ARDUPILOT}" ] || fail "vendor/ardupilot is missing. Clone it first:
-    gh repo clone ArduPilot/ardupilot vendor/ardupilot -- --depth 1 --recurse-submodules"
+
+    gh repo clone ArduPilot/ardupilot vendor/ardupilot -- \
+        --depth 1 --recurse-submodules --config core.autocrlf=false
+
+The --config matters on Windows. core.autocrlf=true is the default there, and
+vendor/ is a separate clone that this repository's .gitattributes cannot reach,
+so git rewrites all 21,822 of ArduPilot's text files to CRLF. waf then fails
+with:
+
+    /usr/bin/env: 'python3\r': No such file or directory"
 
 [ -f "${ARDUPILOT}/Tools/autotest/sim_vehicle.py" ] || fail \
     "vendor/ardupilot looks incomplete -- Tools/autotest/sim_vehicle.py is absent.
     The clone needs --recurse-submodules."
+
+crlf_guard
 
 command -v python3 >/dev/null 2>&1 || fail "python3 not found. SITL's build tooling requires it."
 
