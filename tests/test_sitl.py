@@ -178,19 +178,53 @@ class TestGatesAgainstRealTelemetry:
         )
         assert result.severity is Severity.OK, result.detail
 
-    def test_rtk_gate_correctly_refuses_a_non_rtk_fix(self, link):
-        """SITL's default GPS is not RTK. The gate must say so rather than pass
-        -- it exists precisely to keep a standard fix out of a plot-research
-        dataset."""
+    def test_sitl_reports_rtk_fixed_and_that_is_a_trap(self, link):
+        """SITL's simulated GPS reports fix type 6, RTK_FIXED, out of the box.
+
+        This test was originally written the other way round -- asserting that
+        the RTK gate *refuses* SITL, on the assumption that a simulated GPS
+        would be a plain 3D fix. It is not, and the assumption is the dangerous
+        half: `require_rtk_fixed: true` passes in SITL with no base station, no
+        NTRIP and no correction stream anywhere. Someone could enable that gate,
+        watch it go green in simulation, and conclude the aircraft is
+        RTK-capable.
+
+        It is recorded here as a fact about SITL rather than a property of the
+        gate, so nobody has to rediscover it.
+        """
+        snap = link.snapshot()
+        assert snap.fix_type == 6, f"expected RTK_FIXED, got {snap.fix_name}"
+        assert snap.is_rtk_fixed is True
+
         result = check_gnss(
-            link.snapshot(),
-            min_fix_type=GPS_FIX_3D,
-            require_rtk_fixed=True,
-            max_hdop=2.5,
-            min_satellites=6,
+            snap, min_fix_type=GPS_FIX_3D, require_rtk_fixed=True,
+            max_hdop=2.5, min_satellites=6,
         )
-        assert result.severity is not Severity.OK
-        assert not link.snapshot().is_rtk_fixed
+        assert result.severity is Severity.OK, (
+            "the gate should pass here -- SITL really does claim RTK. "
+            "That it passes is the trap, not a bug."
+        )
+
+    def test_the_rtk_gate_can_still_refuse(self, link):
+        """The gate has to be capable of failing, or its passing means nothing.
+
+        Built from the live snapshot with only the fix type lowered, so every
+        other field is real. `replace` on a frozen dataclass is the honest way
+        to say 'this reading, but without RTK'.
+        """
+        from dataclasses import replace
+
+        degraded = replace(link.snapshot(), fix_type=GPS_FIX_3D)
+        assert degraded.is_rtk_fixed is False
+
+        result = check_gnss(
+            degraded, min_fix_type=GPS_FIX_3D, require_rtk_fixed=True,
+            max_hdop=2.5, min_satellites=6,
+        )
+        assert result.severity is not Severity.OK, (
+            "require_rtk_fixed accepted a plain 3D fix -- the gate that keeps "
+            "a non-RTK position out of a plot-research dataset does nothing"
+        )
 
     def test_attitude_gate_passes_a_level_copter(self, link):
         assert check_attitude(link.snapshot(), max_tilt_deg=10.0).severity is Severity.OK

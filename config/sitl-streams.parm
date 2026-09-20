@@ -1,0 +1,47 @@
+# MAVLink stream rates for the companion-computer link.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# `MavlinkTelemetry` is read-only by construction: it has no method that can
+# transmit, and tests assert that. A normal ground station opens a link and then
+# *asks* for data with REQUEST_DATA_STREAM or SET_MESSAGE_INTERVAL. This
+# companion cannot, so ArduPilot sends it heartbeats and nothing else, and every
+# snapshot comes back empty -- lat None, fix_type 0, hdop 99.9. Which is the
+# correct representation of "no data", and looks exactly like a broken decoder.
+#
+# The resolution is not to make the link writable. It is that the autopilot is
+# configured to stream, once, at setup -- which is how the real aircraft will be
+# built too. The companion listens; the autopilot talks; neither needs the other
+# to ask.
+#
+# SERIAL0 is what scripts/sitl.sh connects to, so these are the SR0_ rates. On
+# the real airframe, set the SRx_ block for whichever port the Pi is wired to
+# (SERIAL1 or SERIAL2 on a Pixhawk) with the same values.
+#
+# Rates are in Hz. They are deliberately modest: the pipeline captures at 1 Hz
+# and gates on telemetry no older than 2 s, so 4-5 Hz gives margin without
+# filling a 57600-baud radio link. Raise EXTRA1 if attitude at capture matters
+# more than bandwidth.
+
+# GPS fix, satellites, HDOP -- the GNSS gate reads all three.
+SR0_EXT_STAT     4
+
+# Position: GLOBAL_POSITION_INT, the lat/lon/alt every detection is placed by.
+SR0_POSITION     4
+
+# Attitude: roll/pitch/yaw. The 10-degree nadir gate reads this, so it wants to
+# be at least as fast as the capture rate.
+SR0_EXTRA1       5
+
+# VFR_HUD: groundspeed, which the motion-blur budget is computed against.
+SR0_EXTRA2       4
+
+# Battery and system status.
+SR0_EXTRA3       2
+
+# Raw IMU and RC are not read by anything in this pipeline. Left at zero rather
+# than "low": an unused stream is bandwidth taken from one that is used.
+SR0_RAW_SENS     0
+SR0_RC_CHAN      0
+SR0_RAW_CTRL     0
+SR0_PARAMS       0
