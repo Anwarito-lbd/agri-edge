@@ -32,3 +32,9 @@ dist/
 build/
 .ruff_cache/
 .mypy_cache/
+
+# Handoff archives. Both committed ones duplicated files tracked beside them --
+# 14 MB for zero information, and git keeps both copies forever. Build one on
+# demand from mechanical/handoff/ when you need to hand something over.
+*.tgz
+*.tar.gz
