@@ -1,4 +1,4 @@
-"""No byte-order mark in a source file.
+"""Bytes that make a file unusable on the machine it is meant to run on.
 
 WHY THIS TEST EXISTS
 --------------------
@@ -20,6 +20,21 @@ JSON and YAML loaders, and `#!/usr/bin/env` on the first line of a shell script,
 which stops working entirely because the kernel sees three bytes before the `#!`.
 
 So the rule is simply: no BOM, anywhere, and fail with the fix in the message.
+
+CRLF, THE SAME STORY A WEEK LATER
+---------------------------------
+`core.autocrlf=true` is the Windows default, so every checkout rewrote LF to
+CRLF in the working tree. Harmless for Python. Fatal for a shell script the
+moment it runs on Linux, because bash takes the carriage return as part of the
+last token on the line:
+
+    scripts/hailo_compile.sh: line 17: $'\\r': command not found
+    scripts/hailo_compile.sh: line 18: set: pipefail\\r: invalid option name
+
+Found when the Hailo preflight was finally run inside WSL2 -- the only place
+the Dataflow Compiler can run. Those scripts had never been executed on Linux,
+so nothing surfaced it. `.gitattributes` now pins LF and the tests below assert
+both the file and the rule.
 """
 
 from pathlib import Path
@@ -27,6 +42,7 @@ from pathlib import Path
 import pytest
 
 BOM = b"\xef\xbb\xbf"
+CRLF = b"\x0d\x0a"
 ROOT = Path(__file__).resolve().parents[1]
 
 # Third-party trees are not ours to reformat, and generated output is not
@@ -116,3 +132,39 @@ def test_every_python_file_parses(path):
         ast.parse(source)
     except SyntaxError as exc:
         pytest.fail(f"{path.relative_to(ROOT).as_posix()}:{exc.lineno}: {exc.msg}")
+
+
+@pytest.mark.parametrize(
+    "path",
+    [p for p in FILES if p.suffix in {".sh", ".bash"}],
+    ids=lambda p: p.relative_to(ROOT).as_posix(),
+)
+def test_shell_scripts_use_lf(path):
+    """A CRLF shell script is a Linux script that cannot run on Linux.
+
+    bash reads the carriage return as part of the last token on every line, so
+    `set -euo pipefail` becomes `pipefail<CR>`, a path argument gains an
+    invisible trailing character, and `$'\\r': command not found` is the only
+    clue. Nothing in the error names line endings.
+    """
+    raw = path.read_bytes()
+    assert CRLF not in raw, (
+        f"{path.relative_to(ROOT).as_posix()} has CRLF line endings and will "
+        "fail on Linux.\n"
+        ".gitattributes pins *.sh to LF; if this fires, the working tree "
+        "predates it. Fix with:  git add --renormalize ."
+    )
+
+
+def test_gitattributes_pins_line_endings():
+    """The test above catches one bad file. This catches the missing rule that
+    would let every future file be bad -- on a Windows clone, silently."""
+    attrs = ROOT / ".gitattributes"
+    assert attrs.exists(), (
+        ".gitattributes is missing, so line endings are decided by whatever "
+        "core.autocrlf each contributor happens to have."
+    )
+    text = attrs.read_text(encoding="utf-8")
+    assert "*.sh" in text and "eol=lf" in text, (
+        ".gitattributes does not pin *.sh to LF"
+    )

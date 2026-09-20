@@ -33,7 +33,13 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ARDUPILOT="${REPO_ROOT}/vendor/ardupilot"
+# Overridable, because building ArduPilot on a Windows drive through WSL's
+# /mnt/c is 5-10x slower than on the Linux filesystem -- waf touches tens of
+# thousands of small files and every one crosses the 9p boundary. Copy the tree
+# to ~/ardupilot inside WSL and point this at it:
+#
+#     ARDUPILOT=~/ardupilot bash scripts/sitl.sh
+ARDUPILOT="${ARDUPILOT:-${REPO_ROOT}/vendor/ardupilot}"
 VEHICLE="${VEHICLE:-ArduCopter}"
 # Winnipeg-ish, matching workstation/fake_autopilot.py so both look the same
 # downstream and a test cannot pass because it silently used the other one.

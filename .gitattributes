@@ -1,0 +1,57 @@
+# Line endings, decided here rather than by whoever cloned the repo.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# `core.autocrlf=true` is the Windows default, so every checkout on this machine
+# rewrote LF to CRLF in the working tree. That is harmless for Python and for
+# anything Windows reads -- and fatal for a shell script the moment it runs on
+# Linux:
+#
+#     scripts/hailo_compile.sh: line 17: $'\r': command not found
+#     scripts/hailo_compile.sh: line 18: set: pipefail\r: invalid option name
+#
+# Found when the Hailo preflight was finally run inside WSL2, which is the only
+# place the Dataflow Compiler can run. The scripts had never been executed on
+# Linux, so nothing surfaced it.
+#
+# Everything here is destined for Linux: WSL2 for the Hailo compiler and
+# ArduPilot SITL, Raspberry Pi OS for the runtime, ubuntu-latest for CI. So LF
+# is the repository's answer and a contributor's git config does not get a vote.
+
+# Text files: normalise to LF in the repository and in the working tree.
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.py        text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.toml      text eol=lf
+*.cfg       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+Makefile    text eol=lf
+Dockerfile  text eol=lf
+
+# PowerShell is the exception: it is the one thing here that only ever runs on
+# Windows, and some older hosts are unhappy with LF.
+*.ps1       text eol=crlf
+
+# Binary. Never touch these -- a "text" conversion silently corrupts them, and
+# a corrupted .onnx or .hef fails at load with an error that says nothing about
+# line endings.
+*.onnx      binary
+*.hef       binary
+*.pth       binary
+*.blend     binary
+*.npy       binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.tif       binary
+*.tiff      binary
+*.stl       binary
+*.pdf       binary
+*.tgz       binary
+*.gz        binary
+*.zip       binary
