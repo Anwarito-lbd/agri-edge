@@ -81,9 +81,27 @@ jobs:
         run: ruff format --check src tests training workstation mechanical scripts
         continue-on-error: true   # advisory until the tree is formatted once
 
-      - name: make typecheck
-        run: make typecheck
-        continue-on-error: true   # advisory: annotations are still going in
+      # A ratchet, not a gate and not a shrug. All 24 current errors were read
+      # individually and every one is a type-NARROWING limitation, not a
+      # defect: handles typed Optional and guarded by a runtime check mypy
+      # cannot follow (`if self.has_position:`), a dict of callables, numpy
+      # list-vs-ndarray, and one variable name reused across mutually exclusive
+      # branches that each return.
+      #
+      # So failing the build on them would be noise. Letting the number drift
+      # upward would lose the next real one in the crowd. The count is pinned:
+      # it may fall, never rise.
+      - name: make typecheck (ratchet)
+        run: |
+          set +e
+          make typecheck | tee /tmp/mypy.txt
+          set -e
+          found=$(grep -oE "Found [0-9]+ error" /tmp/mypy.txt | grep -oE "[0-9]+" || echo 0)
+          echo "mypy errors: $found (ceiling 24)"
+          if [ "$found" -gt 24 ]; then
+            echo "New type errors. Fix them, or justify a higher ceiling here."
+            exit 1
+          fi
 
       - name: make build
         run: make build
