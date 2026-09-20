@@ -188,7 +188,7 @@ def build(af: spec.Airframe, mass: spec.MassBudget) -> dict:
     cyl(col, "Rangefinder", "sensor", 0.010, 0.022, (0.055, 0.0, pz - 0.011), verts=16)
     build_fov(col, af, lens_z)
 
-    # --- landing gear, on the azimuth the camera cares about ---------------
+    # --- landing gear, between the arms ------------------------------------
     for i, (lx, ly, lz) in enumerate(spec.leg_positions(af), start=1):
         top = Vector((lx * 0.30, ly * 0.30, bot_z))
         foot = Vector((lx, ly, lz))
@@ -224,8 +224,9 @@ def build_fov(col, af: spec.Airframe, lens_z: float, to_z: float | None = None):
     depth = lens_z - to_z
     a = depth * math.tan(math.radians(fov.half_width_deg))
     b = depth * math.tan(math.radians(fov.half_height_deg))
-    # Image long axis perpendicular to the legs.
-    yaw = math.radians(af.leg_azimuth_deg + 90.0)
+    # The sensor's long axis, relative to the gear. See Airframe.leg_clearance:
+    # for four symmetric legs this barely matters, and 45 is the worst choice.
+    yaw = math.radians(af.leg_azimuth_deg + af.sensor_yaw_vs_gear_deg)
 
     verts = [(0.0, 0.0, lens_z)]
     for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1)):

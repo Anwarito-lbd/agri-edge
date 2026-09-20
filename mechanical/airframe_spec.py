@@ -20,10 +20,13 @@ THE THREE THINGS THIS ACTUALLY DECIDES
 
    For a SINGLE thing sticking down -- a boom, an antenna, the rangefinder --
    azimuth is worth 40% of the clearance radius, so put it on the short axis.
-   For a symmetric FOUR-leg gear it is worth almost nothing, because two legs
-   always land on the long axis whatever the rotation; rotating to 45 deg makes
-   it 6% worse, not better. `leg_clearance` evaluates all four rather than the
-   one, which is how that got caught.
+
+   For a symmetric FOUR-leg gear it is worth nothing at all: a rotation that
+   takes two legs off the long axis puts the other two onto it. Aligned with
+   the sensor axes is the strict minimum, and turning the sensor costs up to
+   25% at about 37 deg, which is where the pyramid's diagonal lies. Both of
+   those were guessed wrong first -- 40% saving, then 45 deg as the worst case
+   -- and both were caught by evaluating all four legs instead of one.
 
 2. **Whether the propellers fit.** Tip gap falls straight out of wheelbase and
    prop diameter, and a quad whose discs nearly touch loses thrust and gains
@@ -103,14 +106,15 @@ def clearance_radius_m(
     all of them.
 
     `azimuth_deg` is measured in the image's own frame: 0 along the long axis,
-    90 along the short axis. That distinction is the whole point of the
-    function. The pyramid is widest at its corners (about 37 deg azimuth for a
-    4:3 sensor, not 45) and narrowest along the short axis, and the difference
-    between those two placements is over 40% of the required radius.
+    90 along the short axis. The pyramid is widest at its corners (about 37 deg
+    azimuth for a 4:3 sensor, not 45) and narrowest along the short axis, and
+    the difference between those two placements is over 40% of the radius.
 
-    So: **rotate the sensor so its short axis points at the landing gear.**
-    `camera_geometry.yaw_offset_deg` in config/pi.yaml exists precisely so that
-    rotation costs nothing downstream.
+    That 40% is claimable for ONE item -- a boom, an antenna, the rangefinder --
+    by putting it on the short axis, and `camera_geometry.yaw_offset_deg` in
+    config/pi.yaml makes the rotation free. It is NOT claimable for a symmetric
+    four-leg gear, where a rotation that moves two legs off the long axis moves
+    the other two onto it. See `Airframe.leg_clearance`.
     """
     fov = fov or field_of_view()
     a = drop_below_lens_m * math.tan(math.radians(fov.half_width_deg))
@@ -429,9 +433,13 @@ class Airframe:
     lens_drop_from_payload_m: float = 0.035
     leg_span_radius_m: float = 0.260    # foot radius from the optical axis
     leg_height_m: float = 0.255         # foot to the underside of the bottom plate
-    # Azimuth of the legs IN THE IMAGE'S FRAME. 90 puts them on the short axis,
-    # which is where the pyramid is narrowest. See clearance_radius_m.
-    leg_azimuth_deg: float = 90.0
+    # Where the first leg sits, measured from the nose. 0 puts the legs between
+    # the arms, which is the usual quad layout.
+    leg_azimuth_deg: float = 0.0
+    # How the sensor's LONG axis is turned relative to the gear. 0 aligns it
+    # with a pair of legs, and 0 is the best value -- see leg_clearance. The
+    # worst is about 37 deg, the pyramid's own diagonal.
+    sensor_yaw_vs_gear_deg: float = 0.0
 
     isolated_mass_kg: float = 0.320
     isolator_target_hz: float = 35.0
@@ -450,18 +458,37 @@ class Airframe:
         return self.leg_height_m - self.payload_drop_m - self.lens_drop_from_payload_m
 
     def leg_clearance(self) -> dict:
-        """Does the landing gear stay out of frame? Brief item 09."""
+        """Does the landing gear stay out of frame? Brief item 09.
+
+        Evaluates **all four legs**, not the one on the nominal azimuth. That
+        distinction is the whole answer: with legs 90 deg apart and a rectangular
+        pyramid, rotating the sensor moves two legs towards the short axis and
+        the other two towards the corner at the same time, and the corner side
+        loses faster than the short side gains.
+
+        Aligned with the sensor axes is the strict minimum; the worst rotation
+        is the pyramid's diagonal, near 37 deg, and it costs about 25%.
+
+        Azimuth still matters enormously for a *single* item hanging below the
+        lens. That is `obstruction_check`, and it is where the 40% is.
+        """
         drop = self.lens_drop_below_legs_m
-        needed_here = clearance_radius_m(drop, self.leg_azimuth_deg)
+        per_leg = [
+            (j * 90.0 - self.sensor_yaw_vs_gear_deg,
+             clearance_radius_m(drop, j * 90.0 - self.sensor_yaw_vs_gear_deg))
+            for j in range(4)
+        ]
+        needed = max(r for _, r in per_leg)
         needed_worst = worst_case_clearance_radius_m(drop)
         return {
             "lens_height_above_feet_m": drop,
             "leg_radius_m": self.leg_span_radius_m,
-            "required_at_leg_azimuth_m": needed_here,
+            "required_m": needed,
+            "required_per_leg_m": [r for _, r in per_leg],
+            "binding_leg_azimuth_deg": max(per_leg, key=lambda t: t[1])[0] % 360.0,
             "required_worst_azimuth_m": needed_worst,
-            "margin_m": self.leg_span_radius_m - needed_here,
-            "margin_if_azimuth_unknown_m": self.leg_span_radius_m - needed_worst,
-            "in_frame": self.leg_span_radius_m < needed_here,
+            "margin_m": self.leg_span_radius_m - needed,
+            "in_frame": self.leg_span_radius_m < needed,
         }
 
     def obstruction_check(
@@ -570,9 +597,9 @@ class Airframe:
             (
                 "Landing gear outside the view pyramid",
                 not legs["in_frame"],
-                f"legs at {legs['leg_radius_m']*1000:.0f} mm, pyramid needs "
-                f"{legs['required_at_leg_azimuth_m']*1000:.0f} mm at this azimuth "
-                f"({legs['required_worst_azimuth_m']*1000:.0f} mm at the corners)",
+                f"feet at {legs['leg_radius_m']*1000:.0f} mm, worst leg needs "
+                f"{legs['required_m']*1000:.0f} mm "
+                f"({legs['required_worst_azimuth_m']*1000:.0f} mm at a pyramid corner)",
             ),
             (
                 "Isolator at least 3x below blade-pass",
@@ -601,7 +628,7 @@ def motor_positions(af: Airframe) -> list[tuple[float, float, float]]:
 
 
 def leg_positions(af: Airframe) -> list[tuple[float, float, float]]:
-    """Feet, placed on the azimuth the camera cares about, not under the arms."""
+    """Feet, between the arms rather than under them."""
     r = af.leg_span_radius_m
     base = af.leg_azimuth_deg
     return [
@@ -683,7 +710,7 @@ def _print_sheet() -> None:
     legs = s["legs"]
     print(f"  lens above the feet        {legs['lens_height_above_feet_m']*1000:6.0f} mm")
     print(f"  legs at                    {legs['leg_radius_m']*1000:6.0f} mm radius")
-    print(f"  pyramid needs, this azimuth{legs['required_at_leg_azimuth_m']*1000:6.0f} mm")
+    print(f"  pyramid needs (worst leg)  {legs['required_m']*1000:6.0f} mm")
     print(f"  pyramid needs, at a corner {legs['required_worst_azimuth_m']*1000:6.0f} mm")
     print(f"  margin                     {legs['margin_m']*1000:6.0f} mm")
 
