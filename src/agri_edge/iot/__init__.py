@@ -1,4 +1,4 @@
-﻿"""Ground IoT helpers (MQTT topics + optional Mosquitto bridge)."""
+"""Ground IoT helpers (MQTT topics + optional Mosquitto bridge)."""
 
 from agri_edge.iot.mqtt_topics import (
     ALLOWED_KINDS,

@@ -1,4 +1,4 @@
-﻿# Mosquitto + Node-RED beside agri-edge (ground IoT — not the flight Pi)
+# Mosquitto + Node-RED beside agri-edge (ground IoT — not the flight Pi)
 #
 #   docker compose -f ground_iot/docker-compose.yml up -d
 #

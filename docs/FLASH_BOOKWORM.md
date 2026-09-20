@@ -1,4 +1,4 @@
-﻿# Flash Bookworm for agri-edge (Pi 5 + Camera Module 3)
+# Flash Bookworm for agri-edge (Pi 5 + Camera Module 3)
 
 **Use a spare microSD.** Keep the Vocular QNX card untouched.
 

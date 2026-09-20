@@ -1,4 +1,4 @@
-﻿# Target architecture — agri-edge as the brain
+# Target architecture — agri-edge as the brain
 
 **Status:** North-star (19 Sep 2026). Parts exist today; dashed = Next/Later.  
 **Rule:** agri-edge **connects** IoT, edge vehicle, records, and guidance. We do **not** merge Mosquitto/Node-RED/farmOS/ArduPilot/AgOpenGPS source into the product — we integrate at MQTT / HTTP / MAVLink / GPS boundaries.

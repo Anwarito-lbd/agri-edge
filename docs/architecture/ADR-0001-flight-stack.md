@@ -1,4 +1,4 @@
-﻿# ADR-0001 — Flight stack
+# ADR-0001 — Flight stack
 
 **Status:** Accepted for near-term · PX4 deferred  
 **Date:** 2026-09-19

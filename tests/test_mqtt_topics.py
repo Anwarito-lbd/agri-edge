@@ -1,4 +1,4 @@
-﻿"""Tests for MQTT topic contract (no broker required)."""
+"""Tests for MQTT topic contract (no broker required)."""
 
 import pytest
 

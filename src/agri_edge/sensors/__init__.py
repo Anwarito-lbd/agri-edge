@@ -1,4 +1,4 @@
-﻿"""On-board and payload sensing helpers (env, thermal, multispectral)."""
+"""On-board and payload sensing helpers (env, thermal, multispectral)."""
 
 from agri_edge.sensors import environment as environment
 from agri_edge.sensors.multispectral import gndvi, index_map, index_summary, ndre, ndvi, osavi

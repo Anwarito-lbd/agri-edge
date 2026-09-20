@@ -1,4 +1,4 @@
-﻿# Ground IoT stack — Mosquitto + Node-RED
+# Ground IoT stack — Mosquitto + Node-RED
 
 **Decision (19 Sep 2026):** Run **beside** agri-edge with Docker. Do not vendor Node-RED or Mosquitto source into this repo.
 

@@ -1,4 +1,4 @@
-﻿"""Radiometric thermal helpers for water-stress style scoring.
+"""Radiometric thermal helpers for water-stress style scoring.
 
 Hardware-blocked without a radiometric thermal camera. Synthetic arrays are
 fine for Demo / unit tests. This module never talks to the flight controller.

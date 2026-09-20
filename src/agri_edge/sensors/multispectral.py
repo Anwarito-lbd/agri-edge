@@ -1,4 +1,4 @@
-﻿"""Multispectral vegetation indices (NDVI / NDRE / GNDVI / OSAVI).
+"""Multispectral vegetation indices (NDVI / NDRE / GNDVI / OSAVI).
 
 Expects reflectance-like float bands in [0, 1] or digital numbers on a common
 scale. Without a multispectral camera this is Demo/synthetic only. Reuses the

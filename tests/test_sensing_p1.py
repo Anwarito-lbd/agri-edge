@@ -1,4 +1,4 @@
-﻿"""Tests for thermal + multispectral sensing (no hardware)."""
+"""Tests for thermal + multispectral sensing (no hardware)."""
 
 from __future__ import annotations
 

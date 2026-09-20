@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Laptop entrypoint for RelateAnything offline pass.
 
 Never run on the Pi. Example:

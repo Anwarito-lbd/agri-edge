@@ -1,4 +1,4 @@
-﻿# Current system architecture (as implemented)
+# Current system architecture (as implemented)
 
 ## Split
 - **This repo (`agri-edge`):** Python edge pipeline, training, mechanical handoff, ground_iot compose, docs.

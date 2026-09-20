@@ -1,4 +1,4 @@
-﻿# ADR-0002 — Edge compute profiles
+# ADR-0002 — Edge compute profiles
 
 **Status:** Accepted  
 **Date:** 2026-09-19

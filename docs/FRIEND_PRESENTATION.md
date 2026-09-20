@@ -1,4 +1,4 @@
-﻿# agri-edge â€” Friend presentation
+# agri-edge â€” Friend presentation
 
 **For:** mechanical friend (Phase 1 airframe)  
 **From:** Anwar (software / product)  

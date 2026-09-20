@@ -1,4 +1,4 @@
-﻿"""Laptop-only RelateAnything helpers."""
+"""Laptop-only RelateAnything helpers."""
 
 from agri_edge.relations.laptop_relate import (
     NotConfiguredError,

@@ -1,4 +1,4 @@
-﻿"""Laptop-only scene-relation hooks (RelateAnything).
+"""Laptop-only scene-relation hooks (RelateAnything).
 
 DINOv3-licensed weights + Gemma annotation lineage — NOT for the Pi flight
 image. See docs/RELATE_ANYTHING.md.

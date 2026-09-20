@@ -1,4 +1,4 @@
-﻿# MQTT contract — agri-edge ground IoT
+# MQTT contract — agri-edge ground IoT
 
 **Broker:** Mosquitto (see `ground_iot/`)  
 **Scope:** Farm sensors + irrigation actuators on the **ground**. Not aircraft command.

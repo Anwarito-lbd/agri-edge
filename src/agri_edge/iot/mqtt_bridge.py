@@ -1,4 +1,4 @@
-﻿"""Optional Mosquitto bridge stub (paho-mqtt optional)."""
+"""Optional Mosquitto bridge stub (paho-mqtt optional)."""
 
 from __future__ import annotations
 

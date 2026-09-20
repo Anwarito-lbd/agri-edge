@@ -1,4 +1,4 @@
-﻿# Pi bootstrap — Vocular hardware → agri-edge
+# Pi bootstrap — Vocular hardware → agri-edge
 
 **Hardware:** Raspberry Pi 5 + Camera Module 3 (same as Vocular)  
 **Owner:** Anwar — software runs from the laptop once the Pi is on the network.

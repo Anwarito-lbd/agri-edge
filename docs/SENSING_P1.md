@@ -1,4 +1,4 @@
-﻿# Sensing P1 — thermal + multispectral + relations (code)
+# Sensing P1 — thermal + multispectral + relations (code)
 
 **Status:** Software modules landed 19 Sep 2026. Hardware still required for field claims.
 

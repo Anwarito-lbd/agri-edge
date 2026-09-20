@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """YOLOX -> ONNX export entrypoint (wrapper + documented commands).
 
 Status: IMPLEMENTED (wrapper) · real export requires YOLOX + torch (BENCH).

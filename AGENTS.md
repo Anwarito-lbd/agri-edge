@@ -1,4 +1,4 @@
-﻿# AGENTS.md — agri-edge
+# AGENTS.md — agri-edge
 
 ## Governing docs
 - `docs/MASTER_IMPLEMENTATION_SPEC.md` — phased build order and rules

@@ -1,4 +1,4 @@
-﻿"""MQTT topic helpers for ground IoT (Mosquitto / Node-RED).
+"""MQTT topic helpers for ground IoT (Mosquitto / Node-RED).
 
 Aircraft MAVLink is out of scope here. Irrigation commands are ground actuators
 only — never bridge them to the flight stack.
