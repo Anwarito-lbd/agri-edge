@@ -1,6 +1,6 @@
 # Capability status
 
-**Updated:** 2026-09-20 (America/Toronto) — verification audit of both repos; see docs/audit-2026-09-19.md. CI is green on agri-edge and agri-edge-web.
+**Updated:** 2026-09-20 (America/Toronto) — WSL2 installed; ArduCopter SITL built and the pipeline verified against it (14/14, 10 frames spooled with real EKF telemetry). Verification audit in docs/audit-2026-09-19.md. CI green on both repos.
 
 **Legend:** Code = implemented in repo · Sim = works in sim/tests · Hardware = run on real device · Field = farm-validated  
 Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
@@ -28,7 +28,9 @@ Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
 | Thermal / MS indices | ✅ | ✅ | ⏳ cams | ⏳ |
 | RelateAnything | hook only | ⏳ | N/A laptop | ❌ |
 | Companion phone UI | agri-edge-web | Demo | N/A | N/A |
-| ArduPilot SITL | script | ⏳ | N/A | N/A |
+| ArduPilot SITL | ✅ | ✅ **built + run** | N/A | N/A |
+| Pipeline vs real autopilot telemetry | ✅ | ✅ 14/14 + 10 frames spooled | ⏳ | ⏳ |
+| WSL2 toolchain (Stage 0) | ✅ | ✅ | ✅ | N/A |
 | Decision / safety supervisor (flight cmd) | ✅ stub | ✅ | ❌ | ❌ |
 | Physical treatment actuator | ❌ | ❌ | ❌ BLOCKED | ❌ |
 | Postgres / PostGIS schema | ✅ SQL | ✅ SQLite path | ⏳ PG deploy | ❌ |
