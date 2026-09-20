@@ -19,6 +19,11 @@ class VehicleState:
     groundspeed_mps: float | None = None
     battery_pct: float | None = None
     sitl: bool = False
+    # True when these numbers were invented rather than measured. Separate from
+    # `sitl`: a SITL flight produces real MAVLink from a simulated vehicle,
+    # which is a different thing from this adapter making a state up because it
+    # could not connect to anything.
+    simulated: bool = False
     source: str = "none"
 
 
@@ -40,6 +45,11 @@ class VehicleAdapter(Protocol):
     name: str
 
     def connect(self) -> bool:
+        """True only if a real vehicle link was established.
+
+        False means the adapter is usable but simulated. It is not an error and
+        does not raise -- but it must never be reported as a connection.
+        """
         ...
 
     def close(self) -> None:

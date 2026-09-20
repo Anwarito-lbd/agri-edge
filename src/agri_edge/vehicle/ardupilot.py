@@ -1,7 +1,33 @@
-"""ArduPilotAdapter — wraps existing SITL / read-only MAVLink scaffolding.
+"""ArduPilotAdapter -- wraps the SITL / read-only MAVLink scaffolding.
 
-Default: telemetry read-only (uses agri_edge.mavlink when available).
-Commands go through SafetySupervisor and fail closed unless allow_commands+SITL.
+Telemetry is read-only, through `agri_edge.telemetry.mavlink_link`. Commands go
+through SafetySupervisor and fail closed unless allow_commands + SITL.
+
+THE BUG THIS FILE USED TO HAVE
+------------------------------
+The telemetry path imported `agri_edge.mavlink.connection` and
+`agri_edge.mavlink.telemetry`. Neither exists -- the real reader has always been
+`agri_edge.telemetry.mavlink_link.MavlinkTelemetry`. Both imports sat inside a
+bare `except Exception`, so the ModuleNotFoundError was swallowed, the adapter
+fell through to simulation, and `connect()` returned True anyway.
+
+The result was an adapter that reported `connected=True` at latitude 45.0,
+longitude -75.0 with no aircraft, no autopilot and no radio. Only the `source`
+field said "simulated", and nothing was obliged to read it. An audit found it by
+calling `connect()` with a dead UDP endpoint and watching it succeed.
+
+So two things changed, and they are the point of the module now:
+
+* the import names the module that exists, and an ImportError from it is logged
+  rather than silently absorbed into the simulated branch;
+* **`connect()` returns whether a real vehicle link was established.** Simulated
+  operation is still available and still useful, but it is no longer disguised
+  as a connection. `VehicleState.connected` now means a real link; `simulated`
+  says which mode produced the numbers.
+
+That distinction matters because the spec's default failure policy is
+"uncertain position -> application OFF". A fabricated position that claims to be
+connected is exactly the input that defeats it.
 """
 from __future__ import annotations
 
@@ -18,9 +44,11 @@ class ArduPilotAdapter:
     """ArduPilot-facing VehicleAdapter.
 
     Status:
-      * get_state / connect — IMPLEMENTED when pymavlink+endpoint available, else SIMULATED
-      * arm/disarm/set_mode/upload_mission — fail closed unless supervisor allows (SIMULATED)
-      * Physical FC command path — BLOCKED-HARDWARE
+      * get_state / connect -- IMPLEMENTED when pymavlink + a live endpoint are
+        present; otherwise SIMULATED, and `connect()` returns False to say so
+      * arm/disarm/set_mode/upload_mission -- fail closed unless the supervisor
+        allows them, and even then SIMULATED only
+      * Physical FC command path -- BLOCKED-HARDWARE, never emitted
     """
 
     name = "ardupilot"
@@ -37,6 +65,7 @@ class ArduPilotAdapter:
         self.sitl = sitl
         self.supervisor = supervisor or SafetySupervisor(allow_commands=False, require_sitl=True)
         self._conn: Any = None
+        self._real_link = False
         self._simulated = simulated_state or VehicleState(
             connected=False,
             mode="SIMULATED",
@@ -48,36 +77,48 @@ class ArduPilotAdapter:
         self._mode_sim = "GUIDED" if sitl else "UNKNOWN"
 
     def connect(self) -> bool:
-        """Best-effort connect. Falls back to simulated state without raising."""
+        """Open a real link if one is there. Returns whether it is.
+
+        Falling back to simulation is fine and does not raise; reporting that
+        fallback as a connection is not. A caller that checks the return value
+        of `connect()` is entitled to believe it.
+        """
         try:
-            from agri_edge.mavlink.connection import open_connection  # type: ignore
+            from agri_edge.telemetry.mavlink_link import MavlinkTelemetry
 
-            self._conn = open_connection(self.connection_string)
+            link = MavlinkTelemetry(self.connection_string)
+            # Blocks until a heartbeat arrives or the timeout expires; raises if
+            # pymavlink is missing or nothing is talking on that endpoint.
+            link.start()
+            self._conn = link
+            self._real_link = True
+            log.info("ArduPilotAdapter connected to %s", self.connection_string)
             return True
-        except Exception:
-            try:
-                # Optional: pymavlink direct
-                from pymavlink import mavutil  # type: ignore
-
-                self._conn = mavutil.mavlink_connection(self.connection_string)
-                return True
-            except Exception as exc:
-                log.info("ArduPilotAdapter connect SIMULATED (%s)", exc)
-                self._conn = None
-                self._simulated = VehicleState(
-                    connected=True,
-                    mode=self._mode_sim,
-                    armed=self._armed_sim,
-                    lat=45.0,
-                    lon=-75.0,
-                    alt_m=0.0,
-                    heading_deg=0.0,
-                    groundspeed_mps=0.0,
-                    battery_pct=100.0,
-                    sitl=self.sitl,
-                    source="simulated",
-                )
-                return True  # simulated connect succeeds for software tests
+        except Exception as exc:
+            log.info(
+                "ArduPilotAdapter running SIMULATED: no MAVLink link on %s (%s: %s)",
+                self.connection_string, type(exc).__name__, exc,
+            )
+            self._conn = None
+            self._real_link = False
+            self._simulated = VehicleState(
+                    connected=False,
+                mode=self._mode_sim,
+                armed=self._armed_sim,
+                # A plausible-looking position is the dangerous part of a
+                # simulated state, so it stays None. Callers that need a
+                # position get nothing rather than a number from Ottawa.
+                lat=None,
+                lon=None,
+                alt_m=None,
+                heading_deg=None,
+                groundspeed_mps=0.0,
+                battery_pct=100.0,
+                sitl=self.sitl,
+                simulated=True,
+                source="simulated",
+            )
+            return False
 
     def close(self) -> None:
         if self._conn is not None:
@@ -91,8 +132,11 @@ class ArduPilotAdapter:
 
     def get_state(self) -> VehicleState:
         if self._conn is None:
+            # Simulated. `connected` stays False and `simulated` stays True so
+            # that neither a caller reading the flag nor one reading the string
+            # can mistake this for a vehicle.
             return VehicleState(
-                connected=self._simulated.connected,
+                connected=False,
                 mode=self._mode_sim,
                 armed=self._armed_sim,
                 lat=self._simulated.lat,
@@ -102,28 +146,37 @@ class ArduPilotAdapter:
                 groundspeed_mps=self._simulated.groundspeed_mps,
                 battery_pct=self._simulated.battery_pct,
                 sitl=self.sitl,
+                simulated=True,
                 source="simulated",
             )
-        # Read-only best effort — never send set_* here
+        # Read-only. Never send set_* from here -- MavlinkTelemetry has no
+        # write surface at all, and a test asserts that.
         try:
-            from agri_edge.mavlink.telemetry import read_snapshot  # type: ignore
-
-            snap = read_snapshot(self._conn)
+            snap = self._conn.snapshot()
+        except Exception as exc:
+            # A link that stops answering is a degraded link, not a simulated
+            # one, and must not be reported as either connected or simulated.
+            log.warning("MAVLink snapshot failed (%s); reporting disconnected", exc)
             return VehicleState(
-                connected=True,
-                mode=str(snap.get("mode", self._mode_sim)),
-                armed=bool(snap.get("armed", False)),
-                lat=snap.get("lat"),
-                lon=snap.get("lon"),
-                alt_m=snap.get("alt_m"),
-                heading_deg=snap.get("heading_deg"),
-                groundspeed_mps=snap.get("groundspeed_mps"),
-                battery_pct=snap.get("battery_pct"),
-                sitl=self.sitl,
-                source="mavlink",
+                connected=False, mode=self._mode_sim, armed=self._armed_sim,
+                sitl=self.sitl, source="mavlink-lost",
             )
-        except Exception:
-            return VehicleState(connected=True, mode=self._mode_sim, armed=self._armed_sim, sitl=self.sitl, source="mavlink-partial")
+
+        return VehicleState(
+            connected=True,
+            mode=self._mode_sim,
+            armed=self._armed_sim,
+            # has_position is False without a 3D fix, and an unfixed lat/lon is
+            # worse than none: it looks like a position.
+            lat=snap.lat if snap.has_position else None,
+            lon=snap.lon if snap.has_position else None,
+            alt_m=snap.alt_rel_m,
+            heading_deg=snap.yaw_deg,
+            groundspeed_mps=snap.groundspeed_ms,
+            battery_pct=snap.battery_pct,
+            sitl=self.sitl,
+            source="mavlink",
+        )
 
     def _gate(self, command: str) -> CommandResult | None:
         decision = self.supervisor.check_command(command, sitl=self.sitl)
