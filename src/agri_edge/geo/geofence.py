@@ -336,5 +336,8 @@ def load_treatment_boundary(path, origin: tuple[float, float] | None = None):
 
     lats, lons = _latlon(rings[0])
     org = origin or (lats[0], lons[0])
-    holes = [project_to_local(*_latlon(r), org) for r in rings[1:]]
+    holes = []
+    for r in rings[1:]:
+        hlats, hlons = _latlon(r)
+        holes.append(project_to_local(hlats, hlons, org))
     return project_to_local(lats, lons, org), holes, org
