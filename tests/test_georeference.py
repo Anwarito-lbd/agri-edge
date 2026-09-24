@@ -271,6 +271,17 @@ class TestGeoreferenceDetections:
         assert not d.has_position
         assert "altitude" in d.geo_error
 
+    @pytest.mark.parametrize("field,word", [("yaw_deg", "heading"),
+                                            ("roll_deg", "roll"),
+                                            ("pitch_deg", "pitch")])
+    def test_missing_attitude_is_refused_not_assumed(self, field, word):
+        """Audit 24 Sept, F9: a missing heading became 0 (north) and missing
+        roll/pitch became level, producing a rotated but plausible map."""
+        d = self._det(bbox=(0.1, 0.1, 0.2, 0.2))
+        georeference_detections([d], IMX708, self._telem(**{field: None}))
+        assert not d.has_position
+        assert word in d.geo_error
+
     def test_a_detection_on_the_sky_is_left_unplaced_with_a_reason(self):
         d = self._det(bbox=(0.4, 0.0, 0.6, 0.02))
         georeference_detections([d], IMX708, self._telem(pitch_deg=80.0))
