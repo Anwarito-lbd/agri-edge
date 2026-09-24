@@ -23,12 +23,13 @@ SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
 </main>
 <script>
 async function get(path){ const r=await fetch(path); return r.json(); }
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 (async()=>{
   const w=await get('/api/ops/weather');
   const d=await get('/api/ops/weather/derived');
-  document.getElementById('content').innerHTML=`<h3>Observations + aggregates</h3><pre>${JSON.stringify(w,null,2)}</pre>
-  <h3>Derived (origin=DERIVED)</h3><pre>${JSON.stringify(d,null,2)}</pre>`;
+  document.getElementById('content').innerHTML=`<h3>Observations + aggregates</h3><pre>${esc(JSON.stringify(w,null,2))}</pre>
+  <h3>Derived (origin=DERIVED)</h3><pre>${esc(JSON.stringify(d,null,2))}</pre>`;
 })();
 
 </script>

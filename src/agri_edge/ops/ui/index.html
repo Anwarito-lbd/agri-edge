@@ -23,11 +23,12 @@ SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
 </main>
 <script>
 async function get(path){ const r=await fetch(path); return r.json(); }
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 (async()=>{
   await fetch('/api/ops/seed',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
   const o=await get('/api/ops/overview');
-  document.getElementById('content').innerHTML=`<pre>${JSON.stringify(o,null,2)}</pre>`;
+  document.getElementById('content').innerHTML=`<pre>${esc(JSON.stringify(o,null,2))}</pre>`;
 })();
 
 </script>
