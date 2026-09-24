@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>Log in — Agri-Edge Ops</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;background:#0f1a0f;color:#e8f0e8;}
+main{padding:16px;max-width:1100px;margin:0 auto;}
+.card{background:#182818;border:1px solid #2d4a2d;border-radius:8px;padding:14px;margin:10px 0;}
+pre{background:#0a120a;padding:10px;overflow:auto;border-radius:6px;font-size:12px;}
+h1{font-size:1.4rem;} button{padding:8px 12px;cursor:pointer;}
+</style></head><body>
+<nav style="display:flex;gap:12px;padding:12px;background:#1a2e1a;flex-wrap:wrap;">
+<a style="color:#b6f5b6" href="/ops/">Overview</a>
+<a style="color:#b6f5b6" href="/ops/map.html">Map</a>
+<a style="color:#b6f5b6" href="/ops/live.html">Live</a>
+<a style="color:#b6f5b6" href="/ops/weather.html">Weather</a>
+<a style="color:#b6f5b6" href="/ops/sensors.html">Sensors</a>
+<a style="color:#b6f5b6" href="/ops/alerts.html">Alerts</a>
+<a style="color:#b6f5b6" href="/ops/irrigation.html">Irrigation</a>
+<a style="color:#b6f5b6" href="/ops/recommendations.html">Recommendations</a>
+</nav>
+<main>
+<h1>Log in</h1>
+<form id="f" class="card" style="max-width:360px">
+<p><label>Username<br><input id="u" autocomplete="username" required></label></p>
+<p><label>Password<br><input id="p" type="password" autocomplete="current-password" required></label></p>
+<button type="submit">Log in</button>
+<p id="err" role="alert" style="color:#ffb4a8"></p>
+</form>
+</main>
+<script>
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+document.getElementById('f').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const r=await fetch('/api/ops/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:document.getElementById('u').value,password:document.getElementById('p').value})});
+  if(r.ok){location.href='/ops/';return;}
+  const b=await r.json().catch(()=>({}));
+  document.getElementById('err').innerHTML=`${esc(b.error||'Login failed')}`;
+});
+</script>
+</body></html>

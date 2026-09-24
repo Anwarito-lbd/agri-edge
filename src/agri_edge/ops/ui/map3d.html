@@ -18,7 +18,7 @@ SIMULATION — 3D scene JSON for Cesium (synthetic). Not live telemetry. VR unsu
 <div id="scene" class="card">Loading scene…</div>
 </main>
 <script>
-async function get(p){ const r=await fetch(p); return r.json(); }
+async function get(p){ const r=await fetch(p); if(r.status===401){location.href='/ops/login.html';throw new Error('login required');} return r.json(); }
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 (async()=>{
   const vr = await get('/api/ops/vr/status');

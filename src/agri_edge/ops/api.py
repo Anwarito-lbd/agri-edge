@@ -32,7 +32,7 @@ from .odm import ODMPipelineStub
 from .map3d import scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
 from .alerts import InvalidTransition
-from . import agronomy_service, prescription_service, satellite_service
+from . import agronomy_service, auth, prescription_service, satellite_service
 from .ingest import detections_geojson, ingest, replay_ingest_log
 from .types import AlertState, utcnow, new_id
 
@@ -55,9 +55,12 @@ _rx = make_demo_prescription()
 _ingest_lock = threading.Lock()
 
 
-def _json(handler: BaseHTTPRequestHandler, code: int, payload: Any) -> None:
+def _json(handler: BaseHTTPRequestHandler, code: int, payload: Any,
+          headers: Optional[dict[str, str]] = None) -> None:
     body = json.dumps(payload, default=str).encode("utf-8")
     handler.send_response(code)
+    for k, v in (headers or {}).items():
+        handler.send_header(k, v)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
     # No Access-Control-Allow-Origin. The UI is served from this same origin and
@@ -94,7 +97,7 @@ def _optional_float(value: Any, name: str) -> Optional[float]:
         raise BadRequest(f"{name} must be a number, got {value!r}") from None
 
 
-def _write_refusal(handler: BaseHTTPRequestHandler) -> Optional[tuple[int, str]]:
+def _write_refusal(handler: BaseHTTPRequestHandler, check_token: bool = True) -> Optional[tuple[int, str]]:
     """Why this POST must not run, or None if it may.
 
     Three checks, cheapest first:
@@ -119,7 +122,7 @@ def _write_refusal(handler: BaseHTTPRequestHandler) -> Optional[tuple[int, str]]
     if ctype != "application/json":
         return 415, "Content-Type must be application/json"
     token = os.environ.get(TOKEN_ENV)
-    if token:
+    if token and check_token:
         supplied = handler.headers.get("Authorization") or ""
         if not hmac.compare_digest(supplied.encode(), f"Bearer {token}".encode()):
             return 401, "missing or wrong bearer token"
@@ -136,8 +139,38 @@ def build_routes(store: OpsStore) -> dict[str, Any]:
 
 
 class OpsHandler(BaseHTTPRequestHandler):
+    principal: auth.Principal = auth.Principal("dev", "dev", "dev")
+
     def log_message(self, fmt: str, *args: Any) -> None:  # quieter
         pass
+
+    def _authorize(self, store: OpsStore, method: str, path: str) -> Optional[tuple[int, str]]:
+        """Resolve the caller and check the route. None = go ahead.
+
+        With no users configured the station is in its original open mode
+        (loopback, optional OPS_API_TOKEN), and the caller is 'dev'."""
+        if not auth.auth_enabled(store):
+            self.principal = auth.Principal("dev", "dev", "dev")
+            return None
+        if path in auth.PUBLIC or path == "/api/ops/auth/me":
+            self.principal = auth.principal_from(store, self.headers.get("Authorization"),
+                                                 self.headers.get("Cookie")) or auth.Principal("", "", "anonymous")
+            return None
+        p = auth.principal_from(store, self.headers.get("Authorization"), self.headers.get("Cookie"))
+        if p is None:
+            return 401, "log in first"
+        self.principal = p
+        if not auth.may(p, method, path):
+            return 403, f"{p.role} may not {method} {path}"
+        return None
+
+    def _actor(self, body: dict, key: str = "actor") -> str:
+        """The logged-in user's name. The body's actor/by is only a fallback in
+        open (no-users) mode -- it used to be the only source, so the audit log
+        recorded whatever the client claimed."""
+        if self.principal.kind == "user":
+            return self.principal.name
+        return str(body.get(key, "operator"))
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         # Answer the preflight without granting it: no Allow-Origin, so a
@@ -156,7 +189,16 @@ class OpsHandler(BaseHTTPRequestHandler):
         if path == "/ops" or path.startswith("/ops/"):
             return self._serve_ui(path)
 
+        denied = self._authorize(store, "GET", path)
+        if denied is not None:
+            return _json(self, denied[0], {"error": denied[1], "auth_required": True})
+
         try:
+            if path == "/api/ops/auth/me":
+                if self.principal.kind == "anonymous":
+                    return _json(self, 401, {"error": "not logged in", "auth_enabled": True})
+                return _json(self, 200, {"auth_enabled": auth.auth_enabled(store),
+                                         **self.principal.to_dict()})
             if path in ("/", "/api/ops/overview"):
                 return _json(self, 200, {**_banner(store), **store.overview()})
             if path == "/api/ops/live":
@@ -410,9 +452,12 @@ class OpsHandler(BaseHTTPRequestHandler):
         store = get_store()
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
-        refusal = _write_refusal(self)
+        refusal = _write_refusal(self, check_token=not auth.auth_enabled(store))
         if refusal is not None:
             return _json(self, refusal[0], {"error": refusal[1]})
+        denied = self._authorize(store, "POST", path)
+        if denied is not None:
+            return _json(self, denied[0], {"error": denied[1], "auth_required": True})
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
@@ -432,9 +477,30 @@ class OpsHandler(BaseHTTPRequestHandler):
             return _json(self, 400, {"error": "body must be a JSON object"})
 
         try:
+            if path == "/api/ops/auth/login":
+                try:
+                    res = auth.login(store, str(body.get("username", "")), str(body.get("password", "")))
+                except PermissionError as exc:
+                    return _json(self, 429, {"error": str(exc)})
+                if res is None:
+                    return _json(self, 401, {"error": "wrong username or password"})
+                token, exp, user = res
+                secure = "; Secure" if os.environ.get("AGRIEDGE_COOKIE_SECURE") == "1" else ""
+                store.add_audit(user["username"], "login", user["username"], role=user["role"])
+                return _json(self, 200, {"token": token, "expires": exp, "user": user}, headers={
+                    "Set-Cookie": f"ae_session={token}; HttpOnly; SameSite=Strict; Path=/; "
+                                  f"Max-Age={auth.SESSION_S}{secure}"})
+            if path == "/api/ops/auth/logout":
+                return _json(self, 200, {"ok": True}, headers={
+                    "Set-Cookie": "ae_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
+            if path == "/api/ops/auth/users":
+                user = auth.add_user(store, str(body.get("username", "")), str(body.get("password", "")),
+                                     str(body.get("role", "viewer")), body.get("display_name"))
+                store.add_audit(self._actor(body), "user_upsert", user["username"], user["role"])
+                return _json(self, 201, {"user": user})
             if path == "/api/ops/fields":
                 prof = agronomy_service.upsert_field(store, body)
-                store.add_audit(body.get("actor", "operator"), "field_upsert", prof.field_id)
+                store.add_audit(self._actor(body, "actor"), "field_upsert", prof.field_id)
                 return _json(self, 200, {"field": prof.to_dict()})
             if path == "/api/ops/prescriptions":
                 return _json(self, 201, prescription_service.build(store, body))
@@ -442,7 +508,7 @@ class OpsHandler(BaseHTTPRequestHandler):
                 rx_id = path[len("/api/ops/prescriptions/"):-len("/approve")]
                 wind = _optional_float(body.get("wind_ms"), "wind_ms")
                 return _json(self, 200, prescription_service.approve_rx(
-                    store, rx_id, str(body.get("actor", "operator")), wind))
+                    store, rx_id, self._actor(body, "actor"), wind))
             if path == "/api/ops/satellite/refresh":
                 fid = str(body.get("field_id") or "")
                 try:
@@ -488,18 +554,18 @@ class OpsHandler(BaseHTTPRequestHandler):
                 result = seed_demo(store)
                 return _json(self, 200, result)
             if path == "/api/ops/alerts/ack":
-                a = store.alerts.ack(body["alert_id"], body.get("by", "operator"))
+                a = store.alerts.ack(body["alert_id"], self._actor(body, "by"))
                 _notify.send(a)
-                store.add_audit(body.get("by", "operator"), "ack", a.alert_id)
+                store.add_audit(self._actor(body, "by"), "ack", a.alert_id)
                 return _json(self, 200, a.to_dict())
             if path == "/api/ops/alerts/resolve":
-                a = store.alerts.resolve(body["alert_id"], body.get("by", "operator"))
-                store.add_audit(body.get("by", "operator"), "resolve", a.alert_id)
+                a = store.alerts.resolve(body["alert_id"], self._actor(body, "by"))
+                store.add_audit(self._actor(body, "by"), "resolve", a.alert_id)
                 return _json(self, 200, a.to_dict())
             if path == "/api/ops/alerts/escalate":
-                a = store.alerts.escalate(body["alert_id"], body.get("by", "operator"))
+                a = store.alerts.escalate(body["alert_id"], self._actor(body, "by"))
                 _notify.send(a)
-                store.add_audit(body.get("by", "operator"), "escalate", a.alert_id)
+                store.add_audit(self._actor(body, "by"), "escalate", a.alert_id)
                 return _json(self, 200, a.to_dict())
             if path == "/api/ops/map/layers/toggle":
                 asset_id = body["asset_id"]
@@ -516,7 +582,7 @@ class OpsHandler(BaseHTTPRequestHandler):
                 return _json(self, 200, confirm_command(
                     body.get("command", ""),
                     human_confirmed=bool(body.get("human_confirmed")),
-                    actor=body.get("actor", "operator"),
+                    actor=self._actor(body, "actor"),
                 ).to_dict())
             if path == "/api/ops/odm/submit":
                 # Pass the store, or the finished orthomosaic is never registered
@@ -542,8 +608,8 @@ class OpsHandler(BaseHTTPRequestHandler):
             # silently exiting 0 when ruff was absent mattered.
             if path == "/api/ops/vra/approve":
                 wind = _optional_float(body.get("wind_ms"), "wind_ms")
-                result = approve_prescription(_rx, actor=body.get("actor", "operator"), wind_ms=wind)
-                store.add_audit(body.get("actor", "operator"), "vra_approve", _rx.prescription_id, str(result.get("approved")))
+                result = approve_prescription(_rx, actor=self._actor(body, "actor"), wind_ms=wind)
+                store.add_audit(self._actor(body, "actor"), "vra_approve", _rx.prescription_id, str(result.get("approved")))
                 return _json(self, 200, {**_banner(store), **result, "prescription": _rx.to_dict()})
             if path == "/api/ops/mapfield/create":
                 wf = _odm.create_workflow(body.get("field_id", "field_north"), sensor=body.get("sensor", "rgb"), gsd_cm=float(body.get("gsd_cm", 2.5)))
@@ -551,7 +617,7 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/ops/mapfield/validate":
                 return _json(self, 200, {**_banner(store), **_odm.validate_workflow(body["workflow_id"])})
             if path == "/api/ops/mapfield/approve":
-                return _json(self, 200, {**_banner(store), **_odm.approve_workflow(body["workflow_id"], actor=body.get("actor", "operator"))})
+                return _json(self, 200, {**_banner(store), **_odm.approve_workflow(body["workflow_id"], actor=self._actor(body, "actor"))})
             if path == "/api/ops/mapfield/execute":
                 return _json(self, 202, {**_banner(store), **_odm.execute_workflow(body["workflow_id"], store=store)})
             if path == "/api/ops/cameras":
