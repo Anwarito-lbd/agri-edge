@@ -74,8 +74,14 @@ class Pipeline:
         return self
 
     def __exit__(self, *exc) -> None:
-        self.camera.stop()
-        self.telemetry.stop()
+        try:
+            self.camera.stop()
+            self.telemetry.stop()
+        finally:
+            # Release the accelerator too. The Hailo VDevice is exclusive: a
+            # process that never releases it blocks the next run from opening it.
+            if self.engine is not None:
+                self.engine.close()
 
     # -- one frame -------------------------------------------------------------
 

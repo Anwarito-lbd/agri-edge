@@ -67,7 +67,7 @@ else
 fi
 
 # ----------------------------------------------------------------- agri-edge
-say "Installing agri-edge (core + camera + onnx extras only)"
+say "Installing agri-edge (core + onnx + mavlink extras)"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
@@ -78,7 +78,9 @@ if [ ! -d .venv ]; then
     ok "Created .venv"
 fi
 ./.venv/bin/pip install --upgrade pip
-./.venv/bin/pip install -e ".[onnx]"
+# mavlink: without pymavlink a live `agri-edge fly` fails at startup, because
+# the telemetry source cannot be built. The camera comes from apt (above).
+./.venv/bin/pip install -e ".[onnx,mavlink]"
 ok "agri-edge installed"
 
 # ----------------------------------------------------------------- verification

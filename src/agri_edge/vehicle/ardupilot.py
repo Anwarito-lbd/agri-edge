@@ -128,13 +128,17 @@ class ArduPilotAdapter:
             return False
 
     def close(self) -> None:
+        # MavlinkTelemetry is stopped with stop(), not close(). Looking only for
+        # close() found nothing, so the reader thread and its socket leaked.
         if self._conn is not None:
-            try:
-                close = getattr(self._conn, "close", None)
-                if callable(close):
-                    close()
-            except Exception:
-                pass
+            for name in ("stop", "close"):
+                fn = getattr(self._conn, name, None)
+                if callable(fn):
+                    try:
+                        fn()
+                    except Exception:
+                        log.warning("vehicle link %s() failed", name, exc_info=True)
+                    break
         self._conn = None
 
     def get_state(self) -> VehicleState:

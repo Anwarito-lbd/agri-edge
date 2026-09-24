@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 from .capture.camera import build_camera
@@ -262,7 +263,14 @@ def cmd_preflight(args) -> int:
         try:
             telemetry = build_telemetry_source(cfg.mavlink, simulated=False)
             telemetry.start()
+            # start() returns on the first heartbeat; position arrives on its
+            # own stream afterwards. Reading once, immediately, nearly always
+            # warned "no 3D position" on a perfectly healthy link.
+            deadline = time.monotonic() + 5.0
             snap = telemetry.snapshot()
+            while not snap.has_position and time.monotonic() < deadline:
+                time.sleep(0.2)
+                snap = telemetry.snapshot()
             telemetry.stop()
             if not snap.has_position:
                 warnings.append(f"no 3D position yet (fix: {snap.fix_name})")
