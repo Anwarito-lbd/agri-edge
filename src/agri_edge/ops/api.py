@@ -29,6 +29,7 @@ from .commands import confirm_command
 from .odm import ODMPipelineStub
 from .map3d import scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
+from .alerts import InvalidTransition
 from .types import AlertState, utcnow, new_id
 
 UI_DIR = Path(__file__).parent / "ui"
@@ -467,6 +468,8 @@ class OpsHandler(BaseHTTPRequestHandler):
                 return _json(self, 201, note.to_dict())
 
             return _json(self, 404, {"error": "not found", "path": path})
+        except InvalidTransition as exc:
+            return _json(self, 409, {"error": str(exc)})
         except KeyError as exc:
             # A required field missing from the body is the client's error; it
             # was reported as 404, which reads as "no such route".

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Callable, Optional
 
 from .types import (
@@ -36,8 +37,30 @@ TEMP_RULES = {
 }
 
 
+class InvalidTransition(ValueError):
+    """An alert action that its current state does not allow."""
+
+
+# RESOLVED is terminal for operator actions: acknowledging a resolved alert used
+# to flip it back to ACKNOWLEDGED, so a late click on a stale page re-opened
+# something already dealt with. A condition that recurs re-opens it through
+# raise_alert instead, where the source says so.
+_ALLOWED: dict[str, set[AlertState]] = {
+    "ack": {AlertState.OPEN, AlertState.ESCALATED},
+    "resolve": {AlertState.OPEN, AlertState.ACKNOWLEDGED, AlertState.ESCALATED},
+    "escalate": {AlertState.OPEN, AlertState.ACKNOWLEDGED},
+}
+
+
 class AlertEngine:
-    """§93–99 Alert engine with dedupe window."""
+    """§93–99 Alert engine with dedupe window.
+
+    ``dedupe_seconds`` is how long after resolution a recurrence of the same
+    source re-opens that alert instead of raising a new one -- so a sensor
+    flapping around a threshold produces one alert with a reopen count, not an
+    alert storm. Recurrence is never suppressed: a frost alert that comes back
+    must be seen.
+    """
 
     def __init__(self, dedupe_seconds: float = 600.0) -> None:
         self.dedupe_seconds = dedupe_seconds
@@ -115,6 +138,13 @@ class AlertEngine:
                 existing.message = message
                 existing.severity = severity
                 return existing
+            if existing.state == AlertState.RESOLVED and self._within_dedupe(existing):
+                existing.state = AlertState.OPEN
+                existing.updated_at = utcnow().isoformat()
+                existing.message = message
+                existing.severity = severity
+                existing.meta["reopened"] = int(existing.meta.get("reopened", 0)) + 1
+                return existing
         alert = Alert(
             alert_id=new_id("al_"),
             severity=severity,
@@ -131,22 +161,35 @@ class AlertEngine:
         self._by_source[source_key] = alert.alert_id
         return alert
 
-    def ack(self, alert_id: str, by: str) -> Alert:
+    def _within_dedupe(self, alert: Alert) -> bool:
+        try:
+            resolved_at = datetime.fromisoformat(alert.updated_at)
+        except (TypeError, ValueError):
+            return False
+        return (utcnow() - resolved_at).total_seconds() <= self.dedupe_seconds
+
+    def _transition(self, alert_id: str, action: str) -> Alert:
         a = self._require(alert_id)
+        if a.state not in _ALLOWED[action]:
+            raise InvalidTransition(f"cannot {action} alert {alert_id} in state {a.state.value}")
+        return a
+
+    def ack(self, alert_id: str, by: str) -> Alert:
+        a = self._transition(alert_id, "ack")
         a.state = AlertState.ACKNOWLEDGED
         a.ack_by = by
         a.updated_at = utcnow().isoformat()
         return a
 
     def resolve(self, alert_id: str, by: str) -> Alert:
-        a = self._require(alert_id)
+        a = self._transition(alert_id, "resolve")
         a.state = AlertState.RESOLVED
         a.resolved_by = by
         a.updated_at = utcnow().isoformat()
         return a
 
     def escalate(self, alert_id: str, by: str) -> Alert:
-        a = self._require(alert_id)
+        a = self._transition(alert_id, "escalate")
         a.state = AlertState.ESCALATED
         a.updated_at = utcnow().isoformat()
         a.meta["escalated_by"] = by
