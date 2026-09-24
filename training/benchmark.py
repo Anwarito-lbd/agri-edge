@@ -29,9 +29,10 @@ from pathlib import Path
 
 import numpy as np
 
-# Sony IMX708 (Camera Module 3): 7.4 x 5.5 mm sensor, 4.74 mm focal length.
+# Sony IMX708 (Camera Module 3): 6.45 x 3.63 mm active area (4608 x 2592 at
+# 1.4 um), 4.74 mm focal length. 7.4 mm, used before 24 Sept 2026, is the diagonal.
 # Used only to translate FPS into a ground-speed limit; override for other optics.
-SENSOR_WIDTH_MM = 7.4
+SENSOR_WIDTH_MM = 6.45
 FOCAL_LENGTH_MM = 4.74
 
 

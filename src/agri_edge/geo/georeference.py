@@ -107,8 +107,12 @@ class CameraIntrinsics:
 
 
 # Pi Camera Module 3, the baseline for this project.
+# IMX708 active array: 4608 x 2592 at 1.4 um = 6.45 x 3.63 mm. The figures
+# used until 24 Sept 2026 -- 4056 x 3040 and 7.4 mm -- were the HQ camera's
+# (IMX477) resolution and the IMX708's DIAGONAL, which made every ground
+# offset from frame centre ~15% too large.
 IMX708 = CameraIntrinsics(
-    sensor_width_mm=7.4, focal_length_mm=4.74, image_width_px=4056, image_height_px=3040
+    sensor_width_mm=6.45, focal_length_mm=4.74, image_width_px=4608, image_height_px=2592
 )
 
 

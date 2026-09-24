@@ -45,3 +45,22 @@ def test_pipeline_exit_releases_the_engine(tmp_path):
 def test_pi_setup_installs_pymavlink():
     text = (ROOT / "scripts" / "pi_setup.sh").read_text(encoding="utf-8")
     assert '".[onnx,mavlink]"' in text
+
+
+def test_camera_config_matches_the_imx708():
+    """Audit 24 Sept, F8: the Pi config asked the IMX708 (16:9) for 4056x3040
+    -- the HQ camera's resolution -- and used its 7.4 mm diagonal as the width."""
+    import yaml
+
+    from agri_edge.capture.camera import aspect_mismatch
+
+    cfg = yaml.safe_load((ROOT / "config" / "pi.yaml").read_text(encoding="utf-8"))
+    assert aspect_mismatch(tuple(cfg["capture"]["resolution"]), (4608, 2592)) is None
+    assert cfg["camera_geometry"]["sensor_width_mm"] == 6.45
+
+
+def test_aspect_mismatch_names_the_crop():
+    from agri_edge.capture.camera import aspect_mismatch
+
+    assert "CROPPED" in aspect_mismatch((4056, 3040), (4608, 2592))
+    assert aspect_mismatch((2304, 1296), (4608, 2592)) is None

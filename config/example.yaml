@@ -9,7 +9,7 @@ site: example-farm
 field_id: north-quarter
 
 capture:
-  resolution: [4056, 3040]
+  resolution: [4608, 2592]   # Camera Module 3 (IMX708), 16:9
   interval_s: 2.0
   output_dir: ./data/raw
   # Refuse to capture if the autopilot has not reported a position this recently.

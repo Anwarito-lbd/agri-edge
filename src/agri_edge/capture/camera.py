@@ -10,6 +10,7 @@ behave the way the field crew expects before anyone trusts them at 100 m AGL.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 
@@ -18,6 +19,8 @@ from typing import Any
 import numpy as np
 
 from ..telemetry.mavlink_link import TelemetrySnapshot
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -163,6 +166,31 @@ def swap_rb(image: np.ndarray) -> np.ndarray:
     return out
 
 
+def aspect_mismatch(requested: tuple[int, int], sensor: tuple[int, int],
+                    tolerance: float = 0.01) -> str | None:
+    """Explain why a requested size will crop the sensor, or None if it will not.
+
+    The georeference takes `camera_geometry.sensor_width_mm` to describe the
+    width of the IMAGE. If the requested aspect ratio differs from the sensor's,
+    the ISP crops, the image covers less than the full sensor width, and every
+    ground offset is scaled by the crop factor -- silently. Asking the IMX708
+    (16:9) for 4056x3040 (4:3) did exactly that until 24 Sept 2026.
+    """
+    rw, rh = requested
+    sw, sh = sensor
+    if rh <= 0 or sh <= 0:
+        return None
+    req, sen = rw / rh, sw / sh
+    if abs(req - sen) / sen <= tolerance:
+        return None
+    return (
+        f"Requested {rw}x{rh} (aspect {req:.3f}) does not match the sensor's "
+        f"{sw}x{sh} (aspect {sen:.3f}); the image will be CROPPED and "
+        "camera_geometry.sensor_width_mm will not describe it. Request a size with "
+        "the sensor's aspect ratio, or set sensor_width_mm to the cropped width."
+    )
+
+
 class Picamera2Camera(Camera):
     """Raspberry Pi camera backend. Requires the optional `camera` extra.
 
@@ -211,6 +239,9 @@ class Picamera2Camera(Camera):
                 "Install with: pip install 'agri-edge[camera]'"
             ) from exc
         self._cam = Picamera2()
+        problem = aspect_mismatch(self.resolution, tuple(self._cam.sensor_resolution))
+        if problem:
+            log.warning(problem)
         maker = (
             self._cam.create_video_configuration
             if self.video_mode

@@ -29,8 +29,10 @@ import sys
 
 # Sony IMX708, Raspberry Pi Camera Module 3.
 CAMERAS = {
-    "imx708": {"name": "Pi Camera Module 3 (IMX708)", "sensor_w_mm": 7.4, "focal_mm": 4.74,
-               "width_px": 4056, "height_px": 3040},
+    # 4608 x 2592 at 1.4 um -> 6.45 mm wide. Was 7.4 mm x 4056 px: the sensor's
+    # diagonal and the HQ camera's resolution.
+    "imx708": {"name": "Pi Camera Module 3 (IMX708)", "sensor_w_mm": 6.45, "focal_mm": 4.74,
+               "width_px": 4608, "height_px": 2592},
     "imx477": {"name": "Pi HQ Camera (IMX477) + 6mm lens", "sensor_w_mm": 6.287, "focal_mm": 6.0,
                "width_px": 4056, "height_px": 3040},
     "imx296": {"name": "Pi Global Shutter (IMX296) + 6mm lens", "sensor_w_mm": 6.3, "focal_mm": 6.0,
