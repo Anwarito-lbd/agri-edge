@@ -95,3 +95,34 @@ def test_http_ack_of_resolved_alert_is_409():
         assert err.value.code == 409
     finally:
         httpd.shutdown()
+
+
+def test_odm_submit_over_http_registers_the_layer():
+    """Audit 24 Sept: POST /odm/submit did not pass the store, so the finished
+    orthomosaic never appeared as a map layer."""
+    import json
+    import threading
+    import time
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+
+    from agri_edge.ops.api import OpsHandler, create_app_store
+
+    store = create_app_store(seed=True)
+    before = len(store.map_assets)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), OpsHandler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        req = urllib.request.Request(
+            f"http://127.0.0.1:{httpd.server_address[1]}/api/ops/odm/submit",
+            data=json.dumps({"field_id": "field_north"}).encode(),
+            method="POST", headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=10).read()
+        for _ in range(100):
+            if len(store.map_assets) > before:
+                break
+            time.sleep(0.02)
+        assert len(store.map_assets) > before
+    finally:
+        httpd.shutdown()

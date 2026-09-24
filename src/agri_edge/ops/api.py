@@ -416,7 +416,9 @@ class OpsHandler(BaseHTTPRequestHandler):
                     actor=body.get("actor", "operator"),
                 ).to_dict())
             if path == "/api/ops/odm/submit":
-                job = _odm.submit(body.get("field_id", "field_north"))
+                # Pass the store, or the finished orthomosaic is never registered
+                # as a map layer (it was not, until 24 Sept 2026).
+                job = _odm.submit(body.get("field_id", "field_north"), store=store)
                 return _json(self, 202, job.to_dict())
             if path == "/api/ops/irrigation/recommend":
                 rec = rule_based_irrigation(
