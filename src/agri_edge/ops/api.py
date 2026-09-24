@@ -5,11 +5,14 @@ Run: python -m agri_edge.ops.api
 """
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import json
 import mimetypes
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
 from .store import get_store, reset_store, OpsStore
@@ -31,6 +34,12 @@ from .types import AlertState, utcnow, new_id
 UI_DIR = Path(__file__).parent / "ui"
 HOST = "127.0.0.1"
 PORT = 8765
+# Largest request body accepted. Every write here is a few hundred bytes of
+# JSON; an unbounded Content-Length lets one request pin a thread and memory.
+MAX_BODY_BYTES = 1_000_000
+# When set, every POST must carry `Authorization: Bearer <token>`. This is a
+# shared secret, not user accounts -- roles (types.Role) are still future work.
+TOKEN_ENV = "OPS_API_TOKEN"
 
 _gateway = OfflineGateway()
 _odm = ODMPipelineStub()
@@ -44,9 +53,59 @@ def _json(handler: BaseHTTPRequestHandler, code: int, payload: Any) -> None:
     handler.send_response(code)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
-    handler.send_header("Access-Control-Allow-Origin", "*")
+    # No Access-Control-Allow-Origin. The UI is served from this same origin and
+    # the web proxy calls from its server, so neither needs CORS -- and `*` let
+    # any page the operator had open read every response.
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("Cache-Control", "no-store")
     handler.end_headers()
     handler.wfile.write(body)
+
+
+class BadRequest(ValueError):
+    """Client input that cannot be acted on. Answered 400, never 500."""
+
+
+def _optional_float(value: Any, name: str) -> Optional[float]:
+    """None/"" stays None (missing is not zero); anything else must be a number."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise BadRequest(f"{name} must be a number, got {value!r}") from None
+
+
+def _write_refusal(handler: BaseHTTPRequestHandler) -> Optional[tuple[int, str]]:
+    """Why this POST must not run, or None if it may.
+
+    Three checks, cheapest first:
+
+    * A browser always sends Origin on a cross-site POST. If it names a host
+      other than this one, a page the operator happened to have open is trying
+      to use their network position -- refuse it.
+    * The body must be declared JSON. A cross-site ``text/plain`` or form POST
+      needs no CORS preflight, so it is exactly the request a hostile page can
+      send; ``application/json`` forces a preflight, which this server never
+      approves.
+    * When OPS_API_TOKEN is set, the bearer token must match.
+    """
+    origin = handler.headers.get("Origin")
+    if origin and origin != "null":
+        origin_host = urlparse(origin).netloc
+        if origin_host != (handler.headers.get("Host") or ""):
+            return 403, "cross-origin write refused"
+    elif origin == "null":
+        return 403, "opaque-origin write refused"
+    ctype = (handler.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    if ctype != "application/json":
+        return 415, "Content-Type must be application/json"
+    token = os.environ.get(TOKEN_ENV)
+    if token:
+        supplied = handler.headers.get("Authorization") or ""
+        if not hmac.compare_digest(supplied.encode(), f"Bearer {token}".encode()):
+            return 401, "missing or wrong bearer token"
+    return None
 
 
 def _banner(store: OpsStore) -> dict[str, Any]:
@@ -63,10 +122,10 @@ class OpsHandler(BaseHTTPRequestHandler):
         pass
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        # Answer the preflight without granting it: no Allow-Origin, so a
+        # browser refuses to send the cross-origin request that follows.
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Allow", "GET, POST, OPTIONS")
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
@@ -155,7 +214,9 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/ops/vra":
                 return _json(self, 200, {**_banner(store), "prescription": _rx.to_dict()})
             if path == "/api/ops/vra/validate":
-                wind = float((qs.get("wind_ms") or ["0"])[0])
+                # Absent means unknown, not 0 m/s -- the old default of "0"
+                # invented a calm day and validated against it.
+                wind = _optional_float((qs.get("wind_ms") or [None])[0], "wind_ms")
                 return _json(self, 200, {**_banner(store), **validate_prescription(_rx, wind_ms=wind)})
             if path == "/api/ops/vra/feedback":
                 return _json(self, 200, {**_banner(store), **feedback_map_stub(_rx.prescription_id)})
@@ -266,6 +327,8 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/ops/mapfield":
                 return _json(self, 200, {**_banner(store), "workflows": [w.to_dict() for w in _odm.workflows.values()]})
             return _json(self, 404, {"error": "not found", "path": path})
+        except BadRequest as exc:
+            return _json(self, 400, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
             return _json(self, 500, {"error": str(exc)})
 
@@ -273,12 +336,24 @@ class OpsHandler(BaseHTTPRequestHandler):
         store = get_store()
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
-        length = int(self.headers.get("Content-Length") or 0)
+        refusal = _write_refusal(self)
+        if refusal is not None:
+            return _json(self, refusal[0], {"error": refusal[1]})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return _json(self, 400, {"error": "invalid Content-Length"})
+        if length < 0:
+            return _json(self, 400, {"error": "invalid Content-Length"})
+        if length > MAX_BODY_BYTES:
+            return _json(self, 413, {"error": f"body exceeds {MAX_BODY_BYTES} bytes"})
         raw = self.rfile.read(length) if length else b"{}"
         try:
             body = json.loads(raw.decode("utf-8") or "{}")
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, UnicodeDecodeError):
             return _json(self, 400, {"error": "invalid json"})
+        if not isinstance(body, dict):
+            return _json(self, 400, {"error": "body must be a JSON object"})
 
         try:
             if path == "/api/ops/detections":
@@ -288,8 +363,15 @@ class OpsHandler(BaseHTTPRequestHandler):
                 row.setdefault("label", body.get("label", "unknown"))
                 row.setdefault("confidence", float(body.get("confidence", 0.0)))
                 row.setdefault("bbox", body.get("bbox", [0, 0, 0, 0]))
-                row.setdefault("validated_locally", False)
-                row.setdefault("may_drive_treatment", False)
+                # The treatment gate is computed on the edge from the model's
+                # own validation record and the treatment geofence. A caller of
+                # this endpoint cannot grant it: `setdefault` used to keep a
+                # client-sent `may_drive_treatment: true`. What the client
+                # claimed is kept, under a name nothing downstream trusts.
+                for flag in ("validated_locally", "may_drive_treatment"):
+                    if flag in row:
+                        row[f"claimed_{flag}"] = bool(row.pop(flag))
+                    row[flag] = False
                 row.setdefault("synthetic", True)
                 store.persist_detection(row)
                 return _json(self, 201, {**_banner(store), "detection": row, "status": "IMPLEMENTED"})
@@ -350,7 +432,7 @@ class OpsHandler(BaseHTTPRequestHandler):
             # Found by ruff F821 (undefined-name), which is why `make lint`
             # silently exiting 0 when ruff was absent mattered.
             if path == "/api/ops/vra/approve":
-                wind = body.get("wind_ms")
+                wind = _optional_float(body.get("wind_ms"), "wind_ms")
                 result = approve_prescription(_rx, actor=body.get("actor", "operator"), wind_ms=wind)
                 store.add_audit(body.get("actor", "operator"), "vra_approve", _rx.prescription_id, str(result.get("approved")))
                 return _json(self, 200, {**_banner(store), **result, "prescription": _rx.to_dict()})
@@ -386,7 +468,11 @@ class OpsHandler(BaseHTTPRequestHandler):
 
             return _json(self, 404, {"error": "not found", "path": path})
         except KeyError as exc:
-            return _json(self, 404, {"error": str(exc)})
+            # A required field missing from the body is the client's error; it
+            # was reported as 404, which reads as "no such route".
+            return _json(self, 400, {"error": f"missing or unknown: {exc}"})
+        except (BadRequest, ValueError, TypeError) as exc:
+            return _json(self, 400, {"error": str(exc)})
         except Exception as exc:  # noqa: BLE001
             return _json(self, 500, {"error": str(exc)})
 
@@ -416,7 +502,22 @@ def create_app_store(seed: bool = True) -> OpsStore:
     return store
 
 
+def _is_loopback(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 def serve(host: str = HOST, port: int = PORT, seed: bool = True) -> None:
+    if not _is_loopback(host) and not os.environ.get(TOKEN_ENV):
+        raise SystemExit(
+            f"Refusing to serve the Ops API on {host} without {TOKEN_ENV} set: "
+            "every write, including prescription approval, would be open to "
+            "anything on the network."
+        )
     create_app_store(seed=seed)
     httpd = ThreadingHTTPServer((host, port), OpsHandler)
     print(f"Ops Station SIMULATION API at http://{host}:{port}/")

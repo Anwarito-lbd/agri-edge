@@ -55,7 +55,12 @@ def validate_prescription(rx: VariableRatePrescription, *, wind_ms: Optional[flo
             issues.append(f"rate {rate} below min {c.min_rate_l_ha}")
     if c.geofence_required and not rx.validated:
         issues.append("geofence/treatment gate not validated")
-    if wind_ms is not None and wind_ms > c.wind_max_ms:
+    # No wind reading is not calm. An application decision made without one is
+    # a guess, so the gate fails closed on a missing value exactly as it does
+    # on a high one.
+    if wind_ms is None:
+        issues.append("no wind reading: cannot confirm wind below limit")
+    elif wind_ms > c.wind_max_ms:
         issues.append(f"wind {wind_ms} m/s exceeds {c.wind_max_ms}")
     if not c.no_ai_unrestricted_pump:
         issues.append("safety: AI unrestricted pump must remain blocked")
@@ -74,11 +79,15 @@ def approve_prescription(
     *,
     actor: str = "operator",
     wind_ms: Optional[float] = None,
-    force_validated: bool = True,
 ) -> dict[str, Any]:
-    """§158 — safety validate on approve; never auto-apply."""
-    if force_validated:
-        rx.validated = True
+    """§158 — safety validate on approve; never auto-apply.
+
+    Approval never marks a prescription validated. Until 24 Sept 2026 this
+    took ``force_validated=True`` by default and set ``rx.validated`` before
+    checking it, so the geofence/treatment-gate condition could not fail and
+    every prescription was approvable. ``validated`` must be earned by a
+    separate geofence check, not asserted by the act of approving.
+    """
     result = validate_prescription(rx, wind_ms=wind_ms)
     if not result["ok"]:
         return {**result, "approved": False, "actor": actor}
