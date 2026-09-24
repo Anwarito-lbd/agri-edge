@@ -217,7 +217,8 @@ class OpsHandler(BaseHTTPRequestHandler):
             if path == "/api/ops/vra/validate":
                 # Absent means unknown, not 0 m/s -- the old default of "0"
                 # invented a calm day and validated against it.
-                wind = _optional_float((qs.get("wind_ms") or [None])[0], "wind_ms")
+                wind_q = qs.get("wind_ms")
+                wind = _optional_float(wind_q[0] if wind_q else None, "wind_ms")
                 return _json(self, 200, {**_banner(store), **validate_prescription(_rx, wind_ms=wind)})
             if path == "/api/ops/vra/feedback":
                 return _json(self, 200, {**_banner(store), **feedback_map_stub(_rx.prescription_id)})
