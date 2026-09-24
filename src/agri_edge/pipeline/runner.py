@@ -87,10 +87,19 @@ class Pipeline:
         # Refuse to capture without fresh telemetry. An image with no trustworthy
         # position cannot support the temporal comparison that repeated monitoring
         # exists for, and an unlocatable frame costs storage for nothing.
+        #
+        # Position and attitude are checked separately: the georeference needs
+        # both, and one stream can stall while the other keeps arriving.
+        max_age = self.cfg.capture.max_telemetry_age_s
         age = telem.age_s()
-        if telem.timestamp == 0.0 or age > self.cfg.capture.max_telemetry_age_s:
+        if telem.timestamp == 0.0 or age > max_age:
             self.stats.skipped_no_telemetry += 1
-            log.warning("Skipping capture: telemetry stale (%.1f s old).", age)
+            log.warning("Skipping capture: position stale (%.1f s old).", age)
+            return None
+        att_age = telem.attitude_age_s()
+        if att_age is not None and att_age > max_age:
+            self.stats.skipped_no_telemetry += 1
+            log.warning("Skipping capture: attitude stale (%.1f s old).", att_age)
             return None
 
         frame = self.camera.capture(telem)

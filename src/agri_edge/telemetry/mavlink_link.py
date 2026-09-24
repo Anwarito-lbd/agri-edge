@@ -53,6 +53,12 @@ class TelemetrySnapshot:
     snapshot that could be mutated after the fact is not provenance.
     """
 
+    # When the POSITION last updated -- GLOBAL_POSITION_INT, the fused estimate
+    # lat/lon/alt come from. This is what age_s() measures and what the
+    # stale-telemetry gate checks. It used to be bumped by every message type,
+    # battery and airspeed included, so a position stream that stopped while
+    # SYS_STATUS kept arriving looked fresh and every frame got the last known
+    # position: a frozen position that passed as a current one.
     timestamp: float = 0.0
     lat: float | None = None
     lon: float | None = None
@@ -66,6 +72,10 @@ class TelemetrySnapshot:
     satellites: int = 0
     hdop: float = 99.9
     battery_pct: float | None = None
+    # When roll/pitch/yaw last updated (ATTITUDE). 0.0 = never received.
+    attitude_timestamp: float = 0.0
+    # When ANY message last arrived: link liveness, not state freshness.
+    link_timestamp: float = 0.0
 
     @property
     def has_position(self) -> bool:
@@ -80,7 +90,14 @@ class TelemetrySnapshot:
         return self.fix_type == GPS_FIX_RTK_FIXED
 
     def age_s(self, now: float | None = None) -> float:
+        """Age of the POSITION, not of the newest message of any kind."""
         return (now if now is not None else time.time()) - self.timestamp
+
+    def attitude_age_s(self, now: float | None = None) -> float | None:
+        """Age of roll/pitch/yaw, or None if attitude was never received."""
+        if self.attitude_timestamp == 0.0:
+            return None
+        return (now if now is not None else time.time()) - self.attitude_timestamp
 
 
 class TelemetrySource:
@@ -140,6 +157,8 @@ class SimulatedTelemetry(TelemetrySource):
             satellites=18,
             hdop=0.7,
             battery_pct=max(0.0, 100.0 - elapsed * 0.5),
+            attitude_timestamp=now,
+            link_timestamp=now,
         )
 
 
@@ -229,6 +248,7 @@ class MavlinkTelemetry(TelemetrySource):
                 s = replace(
                     s,
                     timestamp=now,
+                    link_timestamp=now,
                     lat=d["lat"] / 1e7,
                     lon=d["lon"] / 1e7,
                     alt_msl_m=d["alt"] / 1000.0,
@@ -236,9 +256,11 @@ class MavlinkTelemetry(TelemetrySource):
                     yaw_deg=d.get("hdg", 0) / 100.0 if d.get("hdg", 0) != 65535 else s.yaw_deg,
                 )
             elif msg_type == "GPS_RAW_INT":
+                # Fix quality only. lat/lon come from GLOBAL_POSITION_INT, so
+                # this must not make the position look fresh.
                 s = replace(
                     s,
-                    timestamp=now,
+                    link_timestamp=now,
                     fix_type=d.get("fix_type", GPS_FIX_NONE),
                     satellites=d.get("satellites_visible", 0),
                     hdop=d.get("eph", 9999) / 100.0,
@@ -248,17 +270,20 @@ class MavlinkTelemetry(TelemetrySource):
 
                 s = replace(
                     s,
-                    timestamp=now,
+                    attitude_timestamp=now,
+                    link_timestamp=now,
                     roll_deg=math.degrees(d["roll"]),
                     pitch_deg=math.degrees(d["pitch"]),
                     yaw_deg=math.degrees(d["yaw"]),
                 )
             elif msg_type == "VFR_HUD":
-                s = replace(s, timestamp=now, groundspeed_ms=d.get("groundspeed"))
+                s = replace(s, link_timestamp=now, groundspeed_ms=d.get("groundspeed"))
             elif msg_type == "SYS_STATUS":
                 remaining = d.get("battery_remaining", -1)
                 if remaining >= 0:
-                    s = replace(s, timestamp=now, battery_pct=float(remaining))
+                    s = replace(s, link_timestamp=now, battery_pct=float(remaining))
+                else:
+                    s = replace(s, link_timestamp=now)
 
             self._snapshot = s
 
