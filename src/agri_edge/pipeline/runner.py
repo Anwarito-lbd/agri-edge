@@ -32,6 +32,7 @@ class RunStats:
     skipped_no_telemetry: int = 0
     detections: int = 0
     spooled: int = 0
+    inference_errors: int = 0
     qa_failure_counts: dict[str, int] = field(default_factory=dict)
 
     def as_dict(self) -> dict:
@@ -42,6 +43,7 @@ class RunStats:
             "skipped_no_telemetry": self.skipped_no_telemetry,
             "detections": self.detections,
             "spooled": self.spooled,
+            "inference_errors": self.inference_errors,
             "qa_failure_counts": dict(self.qa_failure_counts),
         }
 
@@ -113,11 +115,24 @@ class Pipeline:
             for f in qa.failures:
                 self.stats.qa_failure_counts[f.name] = self.stats.qa_failure_counts.get(f.name, 0) + 1
 
-        detections = self._infer(frame, qa)
+        # The frame is spooled whatever the detector does. Inference used to run
+        # before spool.add with nothing around it, so one exception from the
+        # engine -- a driver hiccup, a bad tensor shape -- lost the imagery too,
+        # and imagery is the one thing that can be re-processed later.
+        inference_error = None
+        try:
+            detections = self._infer(frame, qa)
+        except Exception as exc:  # noqa: BLE001 - recorded, and the frame is kept
+            self.stats.inference_errors += 1
+            inference_error = f"{type(exc).__name__}: {exc}"
+            log.exception("Inference failed on frame %s; spooling it without detections.",
+                          frame.sequence)
+            detections = []
         indices = self._index_summaries(frame)
         priority = self._priority(qa, detections)
 
         metadata = self._metadata(frame, qa, detections, indices, priority)
+        metadata["inference_error"] = inference_error
         self.spool.add(
             image=frame.image,
             metadata=metadata,

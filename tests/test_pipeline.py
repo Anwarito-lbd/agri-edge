@@ -382,3 +382,28 @@ class TestSpool:
 
     def test_empty_spool_is_empty_not_an_error(self, tmp_path):
         assert Spool(tmp_path / "fresh").pending() == []
+
+
+class _ExplodingEngine(SimulatedEngine):
+    def infer(self, image):
+        raise RuntimeError("NPU went away")
+
+
+class TestInferenceFailureKeepsTheFrame:
+    """Audit 24 Sept, F10: inference ran before spool.add with nothing around
+    it, so one engine exception lost the imagery as well as the detections."""
+
+    def test_frame_is_spooled_with_the_error_recorded(self, tmp_path):
+        pipe = build(tmp_path, engine=_ExplodingEngine())
+        meta = pipe.process_once()
+        assert meta is not None
+        assert meta["detections"] == []
+        assert "NPU went away" in meta["inference_error"]
+        assert pipe.stats.spooled == 1
+        assert pipe.stats.inference_errors == 1
+        assert len(pipe.spool.pending()) == 1
+
+    def test_healthy_inference_records_no_error(self, tmp_path):
+        pipe = build(tmp_path, engine=SimulatedEngine())
+        meta = pipe.process_once()
+        assert meta["inference_error"] is None
