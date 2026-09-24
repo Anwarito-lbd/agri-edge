@@ -132,6 +132,9 @@ class TiledEngine(InferenceEngine):
                         # Never upgraded here. Tiling changes geometry, not
                         # whether the model has been validated.
                         validated_locally=det.validated_locally,
+                        # What the network said, when the label was collapsed.
+                        # Rebuilding the Detection used to drop it.
+                        source_label=det.source_label,
                     )
                 )
 
