@@ -79,7 +79,7 @@ def test_validation_does_not_treat_missing_wind_as_calm():
 # -- HTTP ---------------------------------------------------------------------
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def server():
     create_app_store(seed=True)
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), OpsHandler)
