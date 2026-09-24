@@ -198,15 +198,18 @@ class Pipeline:
         fence = self._treatment_fence()
         if fence is None:
             return
-        poly, origin = fence
+        poly, holes, origin = fence
         from ..geo.geofence import TreatmentGeofence, project_to_local
 
-        gf = TreatmentGeofence(poly, self.cfg.treatment_zone.buffer_m)
+        gf = TreatmentGeofence(poly, self.cfg.treatment_zone.buffer_m, holes_m=holes)
         for d in detections:
             if not d.has_position:
                 continue
             east, north = project_to_local([d.lat], [d.lon], origin)[0]
-            d.in_treatment_zone = gf.may_treat((east, north))
+            # The georeference's own uncertainty comes out of the buffer.
+            d.in_treatment_zone = gf.may_treat(
+                (east, north), position_error_m=float(d.position_error_m or 0.0)
+            )
 
     def _treatment_fence(self):
         """Load the boundary once and cache it. None when none is configured.
@@ -221,10 +224,10 @@ class Pipeline:
         self._fence_cache = None
         path = self.cfg.treatment_zone.boundary_geojson
         if path is not None:
-            from ..geo.geofence import load_boundary_geojson
+            from ..geo.geofence import load_treatment_boundary
 
             try:
-                self._fence_cache = load_boundary_geojson(path)
+                self._fence_cache = load_treatment_boundary(path)
             except Exception as exc:
                 log.error(
                     "Treatment boundary %s could not be loaded (%s). No detection "
