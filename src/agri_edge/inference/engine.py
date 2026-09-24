@@ -129,12 +129,40 @@ class ModelMetadata:
 
     @classmethod
     def load_beside(cls, model_path: Path) -> "ModelMetadata":
+        """Read `<model>.meta.json`, then decide what may be believed about it.
+
+        * If the meta records a `sha256` and the file does not match, refuse to
+          load: the weights are not the ones the metadata describes.
+        * `validated_locally` is taken from a passing local validation report
+          whose model_sha256 matches THIS file (learning/validate.py) -- never
+          from the meta flag alone. Until 24 Sept 2026 a hand-edited `true` in a
+          JSON file was all it took.
+        """
         meta_path = model_path.with_suffix(model_path.suffix + ".meta.json")
         if not meta_path.exists():
             return cls(name=model_path.stem, validation_notes="No metadata file found.")
         raw = json.loads(meta_path.read_text(encoding="utf-8"))
         known = {f for f in cls.__dataclass_fields__}
-        return cls(**{k: v for k, v in raw.items() if k in known})
+        meta = cls(**{k: v for k, v in raw.items() if k in known})
+        if not model_path.exists():
+            meta.validated_locally = False
+            return meta
+        from ..learning.validate import sha256_file, trust_for
+
+        expected = raw.get("sha256")
+        if expected and sha256_file(model_path) != expected:
+            raise RuntimeError(
+                f"{model_path.name}: sha256 does not match its meta.json. The file is not the "
+                "model the metadata describes; refusing to load it."
+            )
+        from ..ai.validation import load_reports
+
+        trust = trust_for(model_path, meta.validated_locally, load_reports())
+        if meta.validated_locally and not trust.validated_locally:
+            log.warning("%s: %s", model_path.name, trust.reason)
+        meta.validated_locally = trust.validated_locally
+        meta.validation_notes = (meta.validation_notes + " | " if meta.validation_notes else "") + trust.reason
+        return meta
 
 
 class InferenceEngine:

@@ -373,6 +373,93 @@ def cmd_prescription(args) -> int:
     return 0
 
 
+def cmd_walk(args) -> int:
+    """Capture training imagery on foot: camera on a pole, USB GNSS, no aircraft."""
+    from .telemetry.nmea import NmeaTelemetry
+
+    cfg = _load_config(args.config)
+    telemetry = NmeaTelemetry(args.gps, args.baud, pole_height_m=args.pole_height)
+    camera = build_camera(cfg.capture, simulated=False, bands=["red", "green", "blue"])
+    spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
+    engine = build_engine(cfg.inference)
+    print(f"WALK mode: pole {args.pole_height} m, GNSS {args.gps}. Frames are tagged "
+          "capture_mode=walk and are for labelling, not mapping.")
+    with Pipeline(cfg, camera, telemetry, spool, engine, capture_mode="walk") as pipeline:
+        stats = pipeline.run(duration_s=args.duration, max_frames=args.frames)
+    print(json.dumps(stats.as_dict(), indent=2))
+    return 0
+
+
+def _spool_frames(spool: Spool) -> list[tuple[dict, dict]]:
+    out = []
+    for e in spool.entries(include_uploaded=True):
+        try:
+            meta = json.loads((spool.dir / e.meta_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        out.append((e.to_dict(), meta))
+    return out
+
+
+def cmd_label_export(args) -> int:
+    from .learning.labelstudio import export_tasks, label_config
+    from .learning.selection import select
+
+    cfg = _load_config(args.config)
+    spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
+    frames = _spool_frames(spool)
+    by_id = {e["entry_id"]: e for e, _ in frames}
+    chosen = select([(e["entry_id"], m) for e, m in frames], args.n, seed=args.seed)
+    out = Path(args.out)
+    tasks = export_tasks(spool.dir, [by_id[c.entry_id] for c in chosen], out)
+    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    (out / "label_config.xml").write_text(label_config(classes), encoding="utf-8")
+    (out / "selection.json").write_text(json.dumps([c.to_dict() for c in chosen], indent=2),
+                                        encoding="utf-8")
+    print(f"{len(chosen)} of {len(frames)} frames selected -> {tasks}")
+    print(f"Label config: {out / 'label_config.xml'}. Import tasks.json into Label Studio.")
+    return 0
+
+
+def cmd_label_import(args) -> int:
+    from .learning.labelstudio import import_coco, split_by_day
+
+    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    coco = import_coco(json.loads(Path(args.export).read_text(encoding="utf-8")), classes)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "instances_all.json").write_text(json.dumps(coco), encoding="utf-8")
+    msg = f"{len(coco['images'])} labelled images, {len(coco['annotations'])} boxes"
+    if args.val_days:
+        train, val = split_by_day(coco, args.val_days)
+        (out / "instances_train.json").write_text(json.dumps(train), encoding="utf-8")
+        (out / "instances_val.json").write_text(json.dumps(val), encoding="utf-8")
+        msg += f"; split by day: {len(train['images'])} train / {len(val['images'])} val"
+    print(msg)
+    return 0
+
+
+def cmd_validate_model(args) -> int:
+    from .ai.validation import reports_dir
+    from .inference.engine import OnnxEngine
+    from .learning.validate import Criteria, predict_from_spool, run_validation, write_report
+
+    cfg = _load_config(args.config)
+    coco = json.loads(Path(args.coco).read_text(encoding="utf-8"))
+    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    engine = OnnxEngine(Path(args.model), input_size=tuple(cfg.inference.input_size),
+                        confidence_threshold=0.01, class_names=cfg.inference.class_names)
+    preds = predict_from_spool(engine, Path(cfg.spool.spool_dir), coco)
+    crit = Criteria(classes, min_images=args.min_images, op_threshold=args.threshold)
+    report = run_validation(Path(args.model), engine.metadata.name, engine.metadata.version, coco,
+                            preds, crit, args.reviewer, args.notes or "")
+    for c in report["checks"]:
+        print(f"  [{'ok' if c['passed'] else 'FAIL'}] {c['check']}: {c['detail']}")
+    path = write_report(report, reports_dir())
+    print(f"{'PASSED' if report['passed'] else 'NOT PASSED'} -> {path}")
+    return 0 if report["passed"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="agri-edge",
@@ -421,6 +508,38 @@ def main(argv: list[str] | None = None) -> int:
     p_pre = sub.add_parser("preflight", help="Check the edge system before a flight.")
     p_pre.add_argument("--simulate", action="store_true", help="Skip the live telemetry check.")
     p_pre.set_defaults(func=cmd_preflight)
+
+    p_walk = sub.add_parser("walk", help="Capture training imagery on foot (pole + USB GNSS).")
+    p_walk.add_argument("--gps", required=True, help="serial port, e.g. /dev/ttyACM0")
+    p_walk.add_argument("--baud", type=int, default=9600)
+    p_walk.add_argument("--pole-height", type=float, default=2.0)
+    p_walk.add_argument("--duration", type=float)
+    p_walk.add_argument("--frames", type=int)
+    p_walk.set_defaults(func=cmd_walk)
+
+    p_le = sub.add_parser("label-export", help="Pick frames worth labelling; write Label Studio tasks.")
+    p_le.add_argument("--n", type=int, default=100)
+    p_le.add_argument("--out", default="labeling")
+    p_le.add_argument("--classes", required=True, help="comma-separated labels")
+    p_le.add_argument("--seed", type=int, default=0)
+    p_le.set_defaults(func=cmd_label_export)
+
+    p_li = sub.add_parser("label-import", help="Label Studio export -> COCO (split by capture day).")
+    p_li.add_argument("--export", required=True)
+    p_li.add_argument("--classes", required=True)
+    p_li.add_argument("--out", default="data/local/annotations")
+    p_li.add_argument("--val-days", type=int, default=1)
+    p_li.set_defaults(func=cmd_label_import)
+
+    p_vm = sub.add_parser("validate-model", help="Score a model on local labels; write a validation report.")
+    p_vm.add_argument("--model", required=True)
+    p_vm.add_argument("--coco", required=True, help="local labelled set (instances_val.json)")
+    p_vm.add_argument("--classes", required=True, help="classes that must meet the criteria")
+    p_vm.add_argument("--reviewer", required=True)
+    p_vm.add_argument("--notes")
+    p_vm.add_argument("--min-images", type=int, default=200)
+    p_vm.add_argument("--threshold", type=float, default=0.3)
+    p_vm.set_defaults(func=cmd_validate_model)
 
     p_rx = sub.add_parser("prescription", help="Spot-spray map from the spool (ISOXML / shapefile).")
     p_rx.add_argument("--field-id", required=True)

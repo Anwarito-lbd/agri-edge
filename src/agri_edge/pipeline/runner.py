@@ -58,6 +58,7 @@ class Pipeline:
         engine: InferenceEngine | None = None,
         environment=None,
         publisher=None,
+        capture_mode: str = "flight",
     ):
         self.cfg = cfg
         self.camera = camera
@@ -66,6 +67,10 @@ class Pipeline:
         # Optional live link to the ops station (iot/edge_publisher.py). Best
         # effort: the spool above is the record; this is a courtesy.
         self.publisher = publisher
+        # flight | walk | bench | sitl | simulated -- recorded in every sidecar so a
+        # pole-walk frame is never mistaken for an aerial one (different GSD,
+        # different view angle, different training distribution).
+        self.capture_mode = capture_mode
         self.engine = engine
         # Optional. Environmental data is valuable -- and required on spray
         # records -- but never flight-critical, so its absence must not stop a run.
@@ -305,6 +310,7 @@ class Pipeline:
         t = frame.telemetry
         return {
             "schema": "agri-edge/frame/1",
+            "capture_mode": self.capture_mode,
             "site": self.cfg.site,
             "field_id": self.cfg.field_id,
             "sequence": frame.sequence,
