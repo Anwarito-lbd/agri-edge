@@ -45,6 +45,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 
 # Mean Earth radius (WGS-84 semi-major). Good to a few parts per thousand for the
 # local-tangent-plane approximation used here, which is far tighter than any
@@ -53,7 +54,7 @@ _EARTH_R_M = 6_378_137.0
 
 
 def project_to_local(
-    lats: np.ndarray, lons: np.ndarray, origin: tuple[float, float]
+    lats: npt.ArrayLike, lons: npt.ArrayLike, origin: tuple[float, float]
 ) -> np.ndarray:
     """Geographic degrees -> local ENU metres about `origin` (lat, lon).
 
