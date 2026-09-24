@@ -347,6 +347,8 @@ class OpsHandler(BaseHTTPRequestHandler):
         if length < 0:
             return _json(self, 400, {"error": "invalid Content-Length"})
         if length > MAX_BODY_BYTES:
+            # The unread body is still on the socket; do not reuse it.
+            self.close_connection = True
             return _json(self, 413, {"error": f"body exceeds {MAX_BODY_BYTES} bytes"})
         raw = self.rfile.read(length) if length else b"{}"
         try:

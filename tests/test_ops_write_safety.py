@@ -171,10 +171,19 @@ def test_simple_request_content_types_are_refused(server, ctype):
     assert status == 415, body
 
 
-def test_oversized_body_is_refused(server):
-    big = b'{"x": "' + b"a" * 1_100_000 + b'"}'
-    status, _, _ = call(server, "POST", "/api/ops/notes", raw=big)
-    assert status == 413
+def test_oversized_body_is_refused_before_it_is_read(server):
+    """Declared length alone is enough to refuse; the server must not wait to
+    receive (and buffer) a body it is going to reject."""
+    import http.client
+
+    host, port = server.removeprefix("http://").split(":")
+    conn = http.client.HTTPConnection(host, int(port), timeout=10)
+    conn.putrequest("POST", "/api/ops/notes")
+    conn.putheader("Content-Type", "application/json")
+    conn.putheader("Content-Length", str(1_100_000))
+    conn.endheaders()
+    assert conn.getresponse().status == 413
+    conn.close()
 
 
 def test_non_object_body_is_refused(server):
