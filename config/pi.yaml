@@ -174,3 +174,15 @@ mavlink:
   connection: udpin:0.0.0.0:14550
   source_system: 200
   heartbeat_timeout_s: 5.0
+
+# Live reports to the farm's ops station (iot/edge_publisher.py). Best effort:
+# the spool stays the record. Credentials come from the environment
+# (OPS_API_TOKEN for http, MQTT_USERNAME / MQTT_PASSWORD for mqtt).
+publish:
+  enabled: false
+  transport: mqtt          # mqtt | http
+  mqtt_host: 192.168.1.10
+  mqtt_port: 1883
+  farm_id: farm
+  vehicle_id: scout1
+  health_every_frames: 10

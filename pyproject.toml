@@ -22,6 +22,7 @@ cv = ["opencv-python-headless>=4.9"]
 geo = ["rasterio>=1.3"]
 onnx = ["onnxruntime>=1.17"]
 sensors = ["adafruit-circuitpython-bme280>=2.6"]
+mqtt = ["paho-mqtt>=2.0"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]

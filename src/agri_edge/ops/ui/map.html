@@ -28,7 +28,8 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 (async()=>{
   const g=await get('/api/ops/map/geojson');
   const l=await get('/api/ops/map/layers');
-  document.getElementById('content').innerHTML=`<h3>Layers</h3><pre>${esc(JSON.stringify(l,null,2))}</pre>
+  const d=await get('/api/ops/map/detections');
+  document.getElementById('content').innerHTML=`<h3>Detections (${esc((d.features||[]).length)})</h3><pre>${esc(JSON.stringify(d,null,2))}</pre><h3>Layers</h3><pre>${esc(JSON.stringify(l,null,2))}</pre>
   <h3>GeoJSON</h3><pre>${esc(JSON.stringify(g,null,2))}</pre>`;
 })();
 

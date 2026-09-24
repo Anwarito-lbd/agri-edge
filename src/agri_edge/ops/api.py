@@ -5,11 +5,13 @@ Run: python -m agri_edge.ops.api
 """
 from __future__ import annotations
 
+import argparse
 import hmac
 import ipaddress
 import json
 import mimetypes
 import os
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Optional
@@ -30,6 +32,7 @@ from .odm import ODMPipelineStub
 from .map3d import scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
 from .alerts import InvalidTransition
+from .ingest import detections_geojson, ingest, replay_ingest_log
 from .types import AlertState, utcnow, new_id
 
 UI_DIR = Path(__file__).parent / "ui"
@@ -47,6 +50,8 @@ _odm = ODMPipelineStub()
 _notify = MultiplexNotificationProvider([DashboardNotificationProvider(), LogNotificationProvider()])
 _schedules = default_schedules()
 _rx = make_demo_prescription()
+# HTTP handler threads and the MQTT subscriber thread all write the store.
+_ingest_lock = threading.Lock()
 
 
 def _json(handler: BaseHTTPRequestHandler, code: int, payload: Any) -> None:
@@ -189,6 +194,8 @@ class OpsHandler(BaseHTTPRequestHandler):
                 })
             if path == "/api/ops/map" or path == "/api/ops/map/geojson":
                 return _json(self, 200, {**_banner(store), **demo_farm_geojson()})
+            if path == "/api/ops/map/detections":
+                return _json(self, 200, {**_banner(store), **detections_geojson(store)})
             if path == "/api/ops/map/layers":
                 layers = [m.to_dict() for m in store.map_assets.values()]
                 return _json(self, 200, {**_banner(store), "layers": layers, "time_ranges": list(TIME_RANGES)})
@@ -360,6 +367,19 @@ class OpsHandler(BaseHTTPRequestHandler):
             return _json(self, 400, {"error": "body must be a JSON object"})
 
         try:
+            if path == "/api/ops/ingest":
+                # One message {topic, payload} or a batch {messages: [...]}. The
+                # same function the MQTT subscriber calls (ops/ingest.py).
+                msgs = body.get("messages") if "messages" in body else [body]
+                if not isinstance(msgs, list) or not msgs or len(msgs) > 500:
+                    raise BadRequest("messages must be a list of 1-500 {topic, payload}")
+                results = []
+                with _ingest_lock:
+                    for m in msgs:
+                        if not isinstance(m, dict) or "topic" not in m:
+                            raise BadRequest("each message needs a topic and a payload")
+                        results.append(ingest(store, str(m["topic"]), m.get("payload")))
+                return _json(self, 202, {"accepted": len(results), "results": results})
             if path == "/api/ops/detections":
                 row = dict(body)
                 row.setdefault("detection_id", body.get("detection_id") or body.get("id") or f"det_{len(getattr(store, 'detections', []))+1:05d}")
@@ -503,10 +523,14 @@ class OpsHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
-def create_app_store(seed: bool = True) -> OpsStore:
-    store = reset_store()
+def create_app_store(seed: bool = True, sqlite_path: Optional[str] = None) -> OpsStore:
+    store = reset_store(sqlite_path=sqlite_path)
     if seed:
         seed_demo(store)
+    else:
+        # No demo data: whatever the station shows came through ops/ingest.py.
+        store.simulation_mode = False
+    replay_ingest_log(store)
     return store
 
 
@@ -519,22 +543,36 @@ def _is_loopback(host: str) -> bool:
         return False
 
 
-def serve(host: str = HOST, port: int = PORT, seed: bool = True) -> None:
+def serve(host: str = HOST, port: int = PORT, seed: bool = True,
+          db: Optional[str] = None) -> None:
     if not _is_loopback(host) and not os.environ.get(TOKEN_ENV):
         raise SystemExit(
             f"Refusing to serve the Ops API on {host} without {TOKEN_ENV} set: "
             "every write, including prescription approval, would be open to "
             "anything on the network."
         )
-    create_app_store(seed=seed)
+    store = create_app_store(seed=seed, sqlite_path=db)
+    from .mqtt_ingest import start_subscriber
+
+    start_subscriber(store, _ingest_lock)
     httpd = ThreadingHTTPServer((host, port), OpsHandler)
-    print(f"Ops Station SIMULATION API at http://{host}:{port}/")
+    mode = "SIMULATION (seeded demo data)" if seed else "LIVE (ingested data only)"
+    print(f"Ops Station API at http://{host}:{port}/ -- {mode}")
+    if db:
+        print(f"Persisting to {db}; replayed {store.live_messages} messages.")
     print(f"UI: http://{host}:{port}/ops/")
     httpd.serve_forever()
 
 
-def main() -> None:
-    serve()
+def main(argv: Optional[list[str]] = None) -> None:
+    ap = argparse.ArgumentParser(prog="python -m agri_edge.ops.api")
+    ap.add_argument("--host", default=HOST)
+    ap.add_argument("--port", type=int, default=PORT)
+    ap.add_argument("--db", help="SQLite file for durable ingest (replayed on start)")
+    ap.add_argument("--no-seed", action="store_true",
+                    help="start empty and show only ingested data (not the demo)")
+    args = ap.parse_args(argv)
+    serve(host=args.host, port=args.port, seed=not args.no_seed, db=args.db)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 passwd_file="$here/passwd"
 : > "$passwd_file"
 
-for user in sensor agriedge nodered; do
+for user in sensor agriedge nodered drone; do
   read -rsp "Password for MQTT user '$user': " pw
   echo
   docker run --rm -v "$here:/work" eclipse-mosquitto:2 \

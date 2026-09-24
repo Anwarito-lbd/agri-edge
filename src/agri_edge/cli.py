@@ -67,6 +67,9 @@ def cmd_fly(args) -> int:
     spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
     engine = build_engine(cfg.inference)
     environment = build_environment_sensor(cfg.capture, simulated=simulate_camera)
+    from .iot.edge_publisher import build_publisher
+
+    publisher = build_publisher(cfg.publish)
 
     if args.simulate:
         mode = "SIMULATED"
@@ -97,7 +100,8 @@ def cmd_fly(args) -> int:
             "  Detections are decision support only and must not drive treatment.\n"
         )
 
-    with Pipeline(cfg, camera, telemetry, spool, engine, environment) as pipeline:
+    with Pipeline(cfg, camera, telemetry, spool, engine, environment,
+                  publisher=publisher) as pipeline:
         stats = pipeline.run(duration_s=args.duration, max_frames=args.frames)
 
     print("\n--- run summary ---")

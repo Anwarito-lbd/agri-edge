@@ -57,11 +57,15 @@ class Pipeline:
         spool: Spool,
         engine: InferenceEngine | None = None,
         environment=None,
+        publisher=None,
     ):
         self.cfg = cfg
         self.camera = camera
         self.telemetry = telemetry
         self.spool = spool
+        # Optional live link to the ops station (iot/edge_publisher.py). Best
+        # effort: the spool above is the record; this is a courtesy.
+        self.publisher = publisher
         self.engine = engine
         # Optional. Environmental data is valuable -- and required on spray
         # records -- but never flight-critical, so its absence must not stop a run.
@@ -82,6 +86,8 @@ class Pipeline:
             # process that never releases it blocks the next run from opening it.
             if self.engine is not None:
                 self.engine.close()
+            if self.publisher is not None:
+                self.publisher.close()
 
     # -- one frame -------------------------------------------------------------
 
@@ -148,6 +154,11 @@ class Pipeline:
             sequence=frame.sequence,
         )
         self.stats.spooled += 1
+        if self.publisher is not None:
+            self.publisher.publish_frame(metadata)
+            every = max(1, int(self.cfg.publish.health_every_frames))
+            if self.stats.captured % every == 0:
+                self.publisher.publish_health(self.stats.as_dict(), telem, self.spool.stats())
         return metadata
 
     def _infer(self, frame: Frame, qa: QAReport) -> list:

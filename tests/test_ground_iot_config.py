@@ -69,3 +69,16 @@ def test_credentials_are_not_committable():
 def test_images_are_pinned():
     for image in re.findall(r"image:\s*(\S+)", COMPOSE):
         assert not image.endswith(":latest") and ":" in image, image
+
+
+def test_the_drone_user_can_only_report():
+    user, grants = None, {}
+    for ln in _directives(ACL):
+        if ln.startswith("user "):
+            user = ln.split()[1]
+        elif ln.startswith("topic ") and user:
+            grants.setdefault(user, []).append(ln.split()[1:])
+    assert grants["drone"] == [
+        ["write", "agriedge/farm/+/vehicle/+/detections"],
+        ["write", "agriedge/farm/+/vehicle/+/health"],
+    ]

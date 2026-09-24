@@ -49,7 +49,9 @@ ROOT = Path(__file__).resolve().parents[1]
 # committed. Everything else is in scope.
 SKIP_PARTS = {".git", "vendor", "__pycache__", "node_modules", "runs",
               "weights", "data", "YOLOX_outputs", "YOLOX_outputs_crashed",
-              ".venv", "venv", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+              ".venv", "venv", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+              # `make build` output: copies of the tree, not the tree.
+              "build", "dist"}
 TEXT_SUFFIXES = {".py", ".yaml", ".yml", ".json", ".md", ".sh", ".toml",
                  ".cfg", ".ini", ".txt", ".conf", ".html", ".sql", ".js",
                  ".css", ".acl"}

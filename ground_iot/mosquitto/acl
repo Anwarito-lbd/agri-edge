@@ -11,6 +11,12 @@ topic write agriedge/farm/+/zone/+/status
 topic write agriedge/farm/+/zone/+/irrigation/status
 topic read  agriedge/farm/+/zone/+/irrigation/set
 
+# Scouting aircraft: report detections and health, nothing else. There is no
+# vehicle topic that carries a command (iot/mqtt_topics.VEHICLE_KINDS).
+user drone
+topic write agriedge/farm/+/vehicle/+/detections
+topic write agriedge/farm/+/vehicle/+/health
+
 # The agri-edge backend: reads everything on the farm bus. It does not command
 # valves -- irrigation decisions are recommendations a human or Node-RED rule
 # turns into a command.
