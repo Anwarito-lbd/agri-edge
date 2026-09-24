@@ -50,6 +50,8 @@ class SpoolEntry:
     evicted: bool = False
     # Image deleted by the quota, sidecar kept: still uploads as metadata.
     image_evicted: bool = False
+    # An observation log for this frame exists in farmOS.
+    farmos_pushed: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -165,6 +167,10 @@ class Spool:
     def mark_evicted(self, entry_ids: list[str]) -> int:
         """Record that these entries' files are gone and must not be uploaded."""
         return self._mark(entry_ids, "evicted")
+
+    def mark_farmos_pushed(self, entry_ids: list[str]) -> int:
+        """Record that farmOS holds a log for these entries."""
+        return self._mark(entry_ids, "farmos_pushed")
 
     def _mark(self, entry_ids: list[str], flag: str) -> int:
         """Set a boolean flag on index rows.

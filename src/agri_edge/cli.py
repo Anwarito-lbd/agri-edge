@@ -147,7 +147,7 @@ def cmd_spool(args) -> int:
         print("  sidecars only -- images stay spooled for the workstation.")
         farm_result = push_spool(spool, fcfg, limit=args.limit_uploads)
         print(json.dumps(farm_result.as_dict(), indent=2))
-        return 0 if farm_result.failed == 0 else 1
+        return 0 if farm_result.ok else 1
 
     if args.upload:
         from .store.uploader import build_uploader

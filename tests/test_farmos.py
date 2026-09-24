@@ -287,3 +287,56 @@ class TestGeoreferencedDetections:
         data = json.loads(sidecar_to_log(self._meta())["data"]["attributes"]["data"])
         assert data["position_error_m"] == 1.9
         assert data["georeferenced"] == 2
+
+
+class TestIdempotenceAndTime:
+    """Audit 24 Sept, F13: push_spool never recorded what it had pushed, so
+    every run created a duplicate log for every frame; logs carried no
+    timestamp, so farmOS dated them at upload; and an authentication failure
+    left failed == 0, so the CLI exited 0."""
+
+    def _spool(self, tmp_path, n=3):
+        import numpy as np
+
+        spool = Spool(tmp_path / "spool", 10 * 1024 * 1024)
+        for seq in range(n):
+            meta = json.loads(json.dumps(SIDECAR))
+            meta["sequence"] = seq
+            meta["captured_at"] = 1_758_700_000.0 + seq
+            spool.add(np.zeros((4, 4, 3), np.uint8), meta, priority=Priority.NORMAL,
+                      site="s", field_id="f", sequence=seq)
+        return spool
+
+    def test_second_push_creates_nothing(self, stub, tmp_path):
+        url, srv = stub
+        spool = self._spool(tmp_path)
+        first = push_spool(spool, _cfg(url))
+        second = push_spool(spool, _cfg(url))
+        assert first.created == 3
+        assert second.attempted == 0 and second.created == 0
+        assert len(srv.received) == 3
+
+    def test_farmos_push_does_not_consume_the_http_upload_queue(self, stub, tmp_path):
+        url, _ = stub
+        spool = self._spool(tmp_path)
+        push_spool(spool, _cfg(url))
+        assert len(spool.pending()) == 3
+
+    def test_failed_entries_are_retried_next_run(self, stub, tmp_path):
+        url, srv = stub
+        spool = self._spool(tmp_path, n=2)
+        srv.fail_logs = True
+        push_spool(spool, _cfg(url))
+        srv.fail_logs = False
+        assert push_spool(spool, _cfg(url)).created == 2
+
+    def test_log_carries_the_capture_time(self, stub, tmp_path):
+        url, srv = stub
+        push_spool(self._spool(tmp_path, n=1), _cfg(url))
+        ts = srv.received[0]["body"]["data"]["attributes"]["timestamp"]
+        assert ts.startswith("2025-09-24T")
+
+    def test_authentication_failure_is_not_ok(self, tmp_path):
+        spool = Spool(tmp_path / "spool", 1024 * 1024)
+        result = push_spool(spool, _cfg("http://127.0.0.1:1"))
+        assert result.aborted and not result.ok

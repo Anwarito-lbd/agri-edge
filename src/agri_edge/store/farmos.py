@@ -48,6 +48,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from .spool import Spool
@@ -106,9 +107,19 @@ class FarmOSResult:
     failed: int = 0
     log_ids: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    # Set when nothing could be pushed at all -- e.g. authentication failed.
+    # Then `failed` is 0 because nothing was attempted, which used to let the
+    # CLI report success.
+    aborted: bool = False
+
+    @property
+    def ok(self) -> bool:
+        return not self.aborted and self.failed == 0
 
     def as_dict(self) -> dict:
         return {
+            "ok": self.ok,
+            "aborted": self.aborted,
             "attempted": self.attempted,
             "created": self.created,
             "failed": self.failed,
@@ -186,6 +197,14 @@ def sidecar_to_log(meta: dict, land_asset_id: str = "") -> dict:
             }
         ),
     }
+    # When the frame was TAKEN. Without it farmOS stamps the log with the upload
+    # time, so a flight pushed from the office on Friday reads as Friday's.
+    captured = meta.get("captured_at")
+    if isinstance(captured, (int, float)):
+        attributes["timestamp"] = (
+            datetime.fromtimestamp(float(captured), tz=timezone.utc).isoformat()
+        )
+
     # Geometry: prefer where the WEEDS are over where the AIRCRAFT was.
     #
     # The aircraft's position answers "where was the drone", which is nearly
@@ -300,28 +319,40 @@ def push_spool(
         client.authenticate()
     except Exception as exc:
         result.errors.append(f"authentication failed: {exc}")
+        result.aborted = True
         return result
 
-    entries = spool.pending()
+    # Entries already logged in farmOS are skipped. This used to push every
+    # pending sidecar on every run and mark none of them, so each run created
+    # a full duplicate set of observation logs. Tracked separately from
+    # `uploaded`, which belongs to the generic HTTP uploader.
+    entries = [e for e in spool.pending() if not e.farmos_pushed]
     if limit is not None:
         entries = entries[:limit]
     consecutive = 0
-    for entry in entries:
-        result.attempted += 1
-        try:
-            meta = json.loads((spool.dir / entry.meta_path).read_text(encoding="utf-8"))
-            log_id = client.create_log(sidecar_to_log(meta, cfg.land_asset_id))
-            result.created += 1
-            result.log_ids.append(log_id)
-            consecutive = 0
-        except Exception as exc:
-            result.failed += 1
-            result.errors.append(f"{entry.entry_id}: {exc}")
-            consecutive += 1
-            if consecutive >= stop_after_failures:
-                log.warning(
-                    "farmOS: %d consecutive failures, stopping. The link or the "
-                    "server is probably down.", consecutive,
-                )
-                break
+    pushed: list[str] = []
+    try:
+        for entry in entries:
+            result.attempted += 1
+            try:
+                meta = json.loads((spool.dir / entry.meta_path).read_text(encoding="utf-8"))
+                meta.setdefault("entry_id", entry.entry_id)
+                meta.setdefault("captured_at", entry.created_at)
+                log_id = client.create_log(sidecar_to_log(meta, cfg.land_asset_id))
+                result.created += 1
+                result.log_ids.append(log_id)
+                pushed.append(entry.entry_id)
+                consecutive = 0
+            except Exception as exc:
+                result.failed += 1
+                result.errors.append(f"{entry.entry_id}: {exc}")
+                consecutive += 1
+                if consecutive >= stop_after_failures:
+                    log.warning(
+                        "farmOS: %d consecutive failures, stopping. The link or the "
+                        "server is probably down.", consecutive,
+                    )
+                    break
+    finally:
+        spool.mark_farmos_pushed(pushed)
     return result
