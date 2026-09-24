@@ -266,7 +266,11 @@ class OpsHandler(BaseHTTPRequestHandler):
                 filtered = filter_by_time_range(assets, tr)
                 return _json(self, 200, {**_banner(store), "range": tr, "layers": [a.to_dict() for a in filtered]})
             if path == "/api/ops/devices/health":
-                return _json(self, 200, {**_banner(store), "health": [h.to_dict() for h in store.health.values()]})
+                from .device_watch import check as check_devices
+
+                return _json(self, 200, {**_banner(store),
+                                         "health": [h.to_dict() for h in store.health.values()],
+                                         "registered": check_devices(store)})
             if path == "/api/ops/water":
                 return _json(self, 200, {
                     **_banner(store),

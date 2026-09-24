@@ -1,0 +1,98 @@
+# agri-edge weather station: ESP32 + BME280 + cup anemometer + wind vane +
+# tipping-bucket rain gauge. Mains or solar powered, so no deep sleep.
+#
+# Publishes every 60 s on agriedge/farm/<farm>/zone/<zone>/weather in the
+# contract shape. Wind is what gates spraying (SafetyConstraints.wind_max_ms);
+# mount the anemometer at 2 m, where FAO-56 and the spray rules measure it,
+# and clear of buildings by ten times their height.
+#
+# CALIBRATE: anemometer_k (m/s per Hz) and bucket_mm come off the sensor's
+# datasheet (common kits: 0.667 m/s per Hz, 0.2794 mm per tip). Check the
+# rain gauge with a measured volume of water.
+
+substitutions:
+  device_id: wx-01
+  farm: farm
+  zone: z1
+  anemometer_k: "0.667"
+  bucket_mm: "0.2794"
+
+esphome:
+  name: ${device_id}
+
+esp32:
+  board: esp32dev
+
+logger:
+  level: WARN
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  client_id: ${device_id}
+  discovery: false
+  birth_message:
+  will_message:
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+
+sensor:
+  - platform: bme280_i2c
+    address: 0x76
+    update_interval: 10s
+    temperature:
+      id: air_t
+    humidity:
+      id: air_rh
+    pressure:
+      id: air_p
+  - platform: pulse_counter
+    id: wind
+    pin: {number: GPIO27, mode: {input: true, pullup: true}}
+    update_interval: 10s
+    unit_of_measurement: m/s
+    filters:
+      - multiply: ${anemometer_k}
+      - lambda: return x / 60.0;          # pulses per minute -> Hz -> m/s
+      - sliding_window_moving_average: {window_size: 6, send_every: 1}
+  - platform: pulse_counter
+    id: rain
+    pin: {number: GPIO26, mode: {input: true, pullup: true}}
+    internal_filter: 50ms                 # bucket switch bounce
+    update_interval: 60s
+    count_mode: {rising_edge: DISABLE, falling_edge: INCREMENT}
+    filters:
+      - lambda: return x * ${bucket_mm};  # tips in the last minute -> mm
+  - platform: adc
+    id: vane_v
+    pin: GPIO34
+    attenuation: 12db
+    update_interval: 10s
+  - platform: wifi_signal
+    id: rssi
+    update_interval: 60s
+
+interval:
+  - interval: 60s
+    then:
+      - mqtt.publish_json:
+          topic: agriedge/farm/${farm}/zone/${zone}/weather
+          qos: 1
+          payload: |-
+            root["schema_version"] = 1;
+            root["device_id"] = "${device_id}";
+            if (!isnan(id(air_t).state)) root["air_temp_c"] = id(air_t).state;
+            if (!isnan(id(air_rh).state)) root["rh_pct"] = id(air_rh).state;
+            if (!isnan(id(air_p).state)) root["pressure_hpa"] = id(air_p).state;
+            if (!isnan(id(wind).state)) root["wind_ms"] = id(wind).state;
+            if (!isnan(id(rain).state)) root["precip_mm"] = id(rain).state;
+            // Linear vane (0-3.3 V = 0-360 deg); resistor-ladder vanes need a table.
+            if (!isnan(id(vane_v).state)) root["wind_dir_deg"] = id(vane_v).state / 3.3 * 360.0;
+            root["rssi"] = id(rssi).state;
