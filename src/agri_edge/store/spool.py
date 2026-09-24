@@ -14,6 +14,7 @@ the ground, not to a threshold on a Pi.
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import time
 from dataclasses import dataclass, asdict
@@ -22,6 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
+log = logging.getLogger(__name__)
 
 class Priority(IntEnum):
     """Lower value uploads first."""
@@ -43,6 +45,11 @@ class SpoolEntry:
     meta_path: str
     size_bytes: int
     uploaded: bool = False
+    # Payload and sidecar deleted by the quota. Kept in the index as a record
+    # that the frame existed, but never offered for upload again.
+    evicted: bool = False
+    # Image deleted by the quota, sidecar kept: still uploads as metadata.
+    image_evicted: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -105,7 +112,7 @@ class Spool:
 
     # -- reading ---------------------------------------------------------------
 
-    def entries(self, include_uploaded: bool = False) -> list[SpoolEntry]:
+    def entries(self, include_uploaded: bool = False, include_evicted: bool = False) -> list[SpoolEntry]:
         if not self._index_path.exists():
             return []
         out: list[SpoolEntry] = []
@@ -121,6 +128,8 @@ class Spool:
                 continue
             entry = SpoolEntry(**d)
             if entry.uploaded and not include_uploaded:
+                continue
+            if entry.evicted and not include_evicted:
                 continue
             out.append(entry)
         return out
@@ -150,12 +159,20 @@ class Spool:
     # -- completion ------------------------------------------------------------
 
     def mark_uploaded(self, entry_ids: list[str]) -> int:
-        """Rewrite the index marking the given entries uploaded.
+        """Rewrite the index marking the given entries uploaded."""
+        return self._mark(entry_ids, "uploaded")
+
+    def mark_evicted(self, entry_ids: list[str]) -> int:
+        """Record that these entries' files are gone and must not be uploaded."""
+        return self._mark(entry_ids, "evicted")
+
+    def _mark(self, entry_ids: list[str], flag: str) -> int:
+        """Set a boolean flag on index rows.
 
         Written to a temp file and moved into place so an interruption leaves the
         previous index intact rather than a half-written one.
         """
-        if not self._index_path.exists():
+        if not self._index_path.exists() or not entry_ids:
             return 0
         ids = set(entry_ids)
         tmp = self._index_path.with_suffix(".jsonl.tmp")
@@ -168,8 +185,8 @@ class Spool:
                     d = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if d.get("entry_id") in ids and not d.get("uploaded"):
-                    d["uploaded"] = True
+                if d.get("entry_id") in ids and not d.get(flag):
+                    d[flag] = True
                     count += 1
                 out.write(json.dumps(d) + "\n")
         tmp.replace(self._index_path)
@@ -195,10 +212,20 @@ class Spool:
     def _enforce_quota(self) -> None:
         """Drop the lowest-value data first when the disk fills.
 
-        Order of sacrifice: uploaded payloads, then QA-failed frames, oldest
-        first. Anomaly frames are never dropped by the quota -- if the spool is
-        full of anomalies, that is a situation for a human, not for an eviction
-        policy.
+        Order of sacrifice:
+
+        1. payloads of frames already uploaded;
+        2. QA-failed frames, oldest first -- image and sidecar;
+        3. the IMAGES of ordinary frames, oldest first. Their sidecars stay:
+           a few kB each, and they carry the flight record and the decision.
+
+        Anomaly frames are never dropped by the quota -- if the spool is full of
+        anomalies, that is a situation for a human, not for an eviction policy.
+
+        Until 24 Sept 2026 only steps 1-2 existed, and evicted entries stayed
+        "pending" in the index. So a spool of ordinary frames filled the disk and
+        every later save failed, and the uploader tripped over the missing files
+        of evicted entries on every pass and stopped, forever.
         """
         if self.max_bytes <= 0 or self.total_bytes() <= self.max_bytes:
             return
@@ -207,17 +234,34 @@ class Spool:
         if self.total_bytes() <= self.max_bytes:
             return
 
-        degraded = sorted(
-            (e for e in self.pending() if e.priority == Priority.DEGRADED),
-            key=lambda e: e.created_at,
+        by_age = sorted(self.pending(), key=lambda e: e.created_at)
+
+        evicted: list[str] = []
+        try:
+            for entry in (e for e in by_age if e.priority == Priority.DEGRADED):
+                for name in (entry.image_path, entry.meta_path):
+                    (self.dir / name).unlink(missing_ok=True)
+                evicted.append(entry.entry_id)
+                if self.total_bytes() <= self.max_bytes:
+                    return
+        finally:
+            self.mark_evicted(evicted)
+
+        images_dropped: list[str] = []
+        try:
+            for entry in (e for e in by_age if e.priority == Priority.NORMAL and not e.image_evicted):
+                (self.dir / entry.image_path).unlink(missing_ok=True)
+                images_dropped.append(entry.entry_id)
+                if self.total_bytes() <= self.max_bytes:
+                    return
+        finally:
+            self._mark(images_dropped, "image_evicted")
+
+        log.warning(
+            "Spool over quota (%d of %d bytes) with only anomaly frames left. "
+            "Offload the spool; nothing more will be evicted automatically.",
+            self.total_bytes(), self.max_bytes,
         )
-        for entry in degraded:
-            for name in (entry.image_path, entry.meta_path):
-                p = self.dir / name
-                if p.exists():
-                    p.unlink()
-            if self.total_bytes() <= self.max_bytes:
-                return
 
     def export(self, dest: Path) -> int:
         """Copy the spool to removable media, for the drive back to the office.
