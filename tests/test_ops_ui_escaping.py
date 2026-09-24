@@ -22,7 +22,8 @@ import pytest
 
 UI_DIR = Path(__file__).resolve().parents[1] / "src" / "agri_edge" / "ops" / "ui"
 PAGES = sorted(UI_DIR.glob("*.html"))
-PREBUILT_FROM_ESCAPED = {"rows"}
+# Variables assembled from esc()-ed parts by string concatenation.
+PREBUILT_FROM_ESCAPED = {"rows", "items", "extra"}
 INTERPOLATION = re.compile(r"\$\{((?:[^{}]|\{[^{}]*\})*)\}")
 
 

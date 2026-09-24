@@ -32,6 +32,7 @@ from .odm import ODMPipelineStub
 from .map3d import scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
 from .alerts import InvalidTransition
+from . import agronomy_service
 from .ingest import detections_geojson, ingest, replay_ingest_log
 from .types import AlertState, utcnow, new_id
 
@@ -194,6 +195,20 @@ class OpsHandler(BaseHTTPRequestHandler):
                 })
             if path == "/api/ops/map" or path == "/api/ops/map/geojson":
                 return _json(self, 200, {**_banner(store), **demo_farm_geojson()})
+            if path == "/api/ops/fields":
+                return _json(self, 200, {**_banner(store), "fields": [
+                    f.to_dict() for f in agronomy_service.list_fields(store)]})
+            if path == "/api/ops/agronomy":
+                fid = (qs.get("field") or [""])[0]
+                if not fid:
+                    raise BadRequest("field is required")
+                try:
+                    return _json(self, 200, {**_banner(store), **agronomy_service.assess(store, fid)})
+                except KeyError:
+                    return _json(self, 404, {"error": f"unknown field {fid}"})
+            if path == "/api/ops/recommendations":
+                return _json(self, 200, {**_banner(store),
+                                         "recommendations": agronomy_service.all_recommendations(store)})
             if path == "/api/ops/map/detections":
                 return _json(self, 200, {**_banner(store), **detections_geojson(store)})
             if path == "/api/ops/map/layers":
@@ -367,6 +382,10 @@ class OpsHandler(BaseHTTPRequestHandler):
             return _json(self, 400, {"error": "body must be a JSON object"})
 
         try:
+            if path == "/api/ops/fields":
+                prof = agronomy_service.upsert_field(store, body)
+                store.add_audit(body.get("actor", "operator"), "field_upsert", prof.field_id)
+                return _json(self, 200, {"field": prof.to_dict()})
             if path == "/api/ops/ingest":
                 # One message {topic, payload} or a batch {messages: [...]}. The
                 # same function the MQTT subscriber calls (ops/ingest.py).

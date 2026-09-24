@@ -16,12 +16,14 @@ SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
 <a style="color:#b6f5b6" href="/ops/sensors.html">Sensors</a>
 <a style="color:#b6f5b6" href="/ops/alerts.html">Alerts</a>
 <a style="color:#b6f5b6" href="/ops/irrigation.html">Irrigation</a>
+<a style="color:#b6f5b6" href="/ops/recommendations.html">Recommendations</a>
 </nav>
 <main>
 <h1>Alerts</h1>
 <div id="content" class="card">Loading…</div>
 </main>
 <script>
+fetch('/api/ops/overview').then(r=>r.json()).then(o=>{if(!o.simulation){const b=document.getElementById('sim-banner');if(b)b.style.display='none';}}).catch(()=>{});
 async function get(path){ const r=await fetch(path); return r.json(); }
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
