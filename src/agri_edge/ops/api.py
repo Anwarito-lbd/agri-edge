@@ -32,7 +32,7 @@ from .odm import ODMPipelineStub
 from .map3d import scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
 from .alerts import InvalidTransition
-from . import agronomy_service, satellite_service
+from . import agronomy_service, prescription_service, satellite_service
 from .ingest import detections_geojson, ingest, replay_ingest_log
 from .types import AlertState, utcnow, new_id
 
@@ -67,6 +67,17 @@ def _json(handler: BaseHTTPRequestHandler, code: int, payload: Any) -> None:
     handler.send_header("Cache-Control", "no-store")
     handler.end_headers()
     handler.wfile.write(body)
+
+
+def _binary(handler: BaseHTTPRequestHandler, data: bytes, ctype: str, filename: str) -> None:
+    handler.send_response(200)
+    handler.send_header("Content-Type", ctype)
+    handler.send_header("Content-Length", str(len(data)))
+    handler.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(data)
 
 
 class BadRequest(ValueError):
@@ -221,6 +232,29 @@ class OpsHandler(BaseHTTPRequestHandler):
                     return _json(self, 404, {"error": f"unknown field {fid}"})
                 except ValueError as exc:
                     return _json(self, 400, {"error": str(exc)})
+            if path == "/api/ops/prescriptions":
+                return _json(self, 200, {**_banner(store), "prescriptions": prescription_service.listing(store)})
+            if path.startswith("/api/ops/prescriptions/"):
+                parts = path[len("/api/ops/prescriptions/"):].split("/")
+                try:
+                    rec = prescription_service.get(store, parts[0])
+                except KeyError:
+                    return _json(self, 404, {"error": f"unknown prescription {parts[0]}"})
+                if len(parts) == 1:
+                    g = rec["grid"]
+                    return _json(self, 200, {**_banner(store), **g.summary(), "geojson": g.geojson()})
+                if parts[1:] == ["export"]:
+                    fmt = (qs.get("format") or ["isoxml"])[0]
+                    from ..prescription.export import NotApproved
+
+                    try:
+                        data = prescription_service.export(store, parts[0], fmt)
+                    except NotApproved as exc:
+                        return _json(self, 409, {"error": str(exc)})
+                    except ValueError as exc:
+                        return _json(self, 400, {"error": str(exc)})
+                    return _binary(self, data, "application/zip", f"{parts[0]}_{fmt}.zip")
+                return _json(self, 404, {"error": "not found", "path": path})
             if path == "/api/ops/map/detections":
                 return _json(self, 200, {**_banner(store), **detections_geojson(store)})
             if path == "/api/ops/map/layers":
@@ -398,6 +432,13 @@ class OpsHandler(BaseHTTPRequestHandler):
                 prof = agronomy_service.upsert_field(store, body)
                 store.add_audit(body.get("actor", "operator"), "field_upsert", prof.field_id)
                 return _json(self, 200, {"field": prof.to_dict()})
+            if path == "/api/ops/prescriptions":
+                return _json(self, 201, prescription_service.build(store, body))
+            if path.startswith("/api/ops/prescriptions/") and path.endswith("/approve"):
+                rx_id = path[len("/api/ops/prescriptions/"):-len("/approve")]
+                wind = _optional_float(body.get("wind_ms"), "wind_ms")
+                return _json(self, 200, prescription_service.approve_rx(
+                    store, rx_id, str(body.get("actor", "operator")), wind))
             if path == "/api/ops/satellite/refresh":
                 fid = str(body.get("field_id") or "")
                 try:

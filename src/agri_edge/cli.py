@@ -327,6 +327,52 @@ def cmd_satellite(args) -> int:
     return 0 if not out["failed"] else 1
 
 
+def cmd_prescription(args) -> int:
+    """Spot-spray prescription from the spool's georeferenced detections.
+
+    Approval is part of the command, not a separate flag to forget: without
+    --approve-as and a measured --wind-ms nothing is written.
+    """
+    from .ai.validation import validated_models
+    from .prescription.export import approve, export_zip
+    from .prescription.grid import DetectionPoint, spot_spray
+
+    cfg = _load_config(args.config)
+    boundary = json.loads(Path(args.boundary).read_text(encoding="utf-8"))
+    if boundary.get("type") == "FeatureCollection":
+        boundary = boundary["features"][0]
+    if boundary.get("type") == "Feature":
+        boundary = boundary["geometry"]
+    spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
+    dets = []
+    for entry in spool.entries(include_uploaded=True):
+        try:
+            meta = json.loads((spool.dir / entry.meta_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        model = meta.get("model") or {}
+        for d in meta.get("detections") or []:
+            if d.get("lat") is None:
+                continue
+            dets.append(DetectionPoint(d["lat"], d["lon"], d.get("label", "weed"),
+                                       float(d.get("confidence", 0)), float(d.get("position_error_m") or 0),
+                                       (str(model.get("name")), str(model.get("version")))))
+    g = spot_spray(args.field_id, boundary, dets, rate=args.rate, product=args.product,
+                   unit=args.unit, cell_m=args.cell_m, buffer_m=args.buffer_m,
+                   validated_models=validated_models())
+    print(json.dumps(g.summary(), indent=2))
+    if not (args.approve_as and args.out):
+        print("Not exported: pass --approve-as NAME, --wind-ms and --out to approve and write it.")
+        return 1
+    result = approve(g, args.approve_as, args.wind_ms)
+    if not result["approved"]:
+        print("NOT APPROVED:\n  " + "\n  ".join(result["issues"]), file=sys.stderr)
+        return 1
+    Path(args.out).write_bytes(export_zip(g, boundary, args.format, field_name=args.field_id))
+    print(f"Wrote {args.out} ({args.format}), approved by {args.approve_as}.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="agri-edge",
@@ -375,6 +421,20 @@ def main(argv: list[str] | None = None) -> int:
     p_pre = sub.add_parser("preflight", help="Check the edge system before a flight.")
     p_pre.add_argument("--simulate", action="store_true", help="Skip the live telemetry check.")
     p_pre.set_defaults(func=cmd_preflight)
+
+    p_rx = sub.add_parser("prescription", help="Spot-spray map from the spool (ISOXML / shapefile).")
+    p_rx.add_argument("--field-id", required=True)
+    p_rx.add_argument("--boundary", required=True, help="treatment boundary GeoJSON Polygon")
+    p_rx.add_argument("--rate", type=float, required=True)
+    p_rx.add_argument("--unit", default="L/ha", choices=["L/ha", "kg/ha"])
+    p_rx.add_argument("--product", default="herbicide")
+    p_rx.add_argument("--cell-m", type=float, default=6.0, help="sprayer section width")
+    p_rx.add_argument("--buffer-m", type=float, default=10.0)
+    p_rx.add_argument("--format", default="isoxml", choices=["isoxml", "shapefile", "geojson"])
+    p_rx.add_argument("--out", help="zip file to write")
+    p_rx.add_argument("--approve-as", help="name of the person approving")
+    p_rx.add_argument("--wind-ms", type=float, help="measured wind speed now")
+    p_rx.set_defaults(func=cmd_prescription)
 
     p_sat = sub.add_parser("satellite", help="Update a field's Sentinel-2 series; flag patches to scout.")
     p_sat.add_argument("--field-id", required=True)
