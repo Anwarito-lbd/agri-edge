@@ -1,6 +1,6 @@
 # Capability status
 
-**Updated:** 2026-09-20 (America/Toronto) — WSL2 installed; ArduCopter SITL built and the pipeline verified against it (14/14, 10 frames spooled with real EKF telemetry). Verification audit in docs/audit-2026-09-19.md. CI green on both repos.
+**Updated:** 2026-09-24 — second verification audit (docs/audit-2026-09-24.md): 15 defects fixed with tests (safety gates, ops API write surface, MQTT broker, telemetry freshness, spool, Hailo decode, Camera Module 3 geometry); ops checklist re-graded 80 DONE / 8 PARTIAL. Previous: 2026-09-20 (America/Toronto) — WSL2 installed; ArduCopter SITL built and the pipeline verified against it (14/14, 10 frames spooled with real EKF telemetry). Verification audit in docs/audit-2026-09-19.md. CI green on both repos.
 
 **Legend:** Code = implemented in repo · Sim = works in sim/tests · Hardware = run on real device · Field = farm-validated  
 Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
@@ -23,7 +23,9 @@ Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
 | VehicleAdapter + ArduPilot stub | ✅ | ✅ fail-closed | ❌ BLOCKED cmds | ❌ |
 | farmOS client | ✅ | stub | ⏳ | ⏳ |
 | WebODM client | ✅ | stub | ⏳ | ⏳ |
-| Ground MQTT topics | ✅ | ✅ | ⏳ | ⏳ |
+| Ground MQTT topics (helpers + ACL'd broker) | ✅ | ⏳ nothing publishes or ingests yet | ⏳ | ⏳ |
+| Edge → MQTT detection publisher | ❌ | ❌ | ❌ | ❌ |
+| Ops store ingestion (MQTT/HTTP → store) | ❌ | ❌ | N/A | ❌ |
 | Mosquitto + Node-RED compose | ✅ | ⏳ | N/A | N/A |
 | Thermal / MS indices | ✅ | ✅ | ⏳ cams | ⏳ |
 | RelateAnything | hook only | ⏳ | N/A laptop | ❌ |
@@ -67,5 +69,5 @@ Do not mark Hardware/Field green without evidence.
 | Irrigation rule skeleton | ✅ | ✅ | ⏳ MQTT | ❌ |
 | VRA + ODM + 3D | partial/stub | ✅ | ❌ | ❌ |
 
-Checklist: `docs/operations/PHASE_CHECKLIST_79_166.md` — DONE 88/88. **Do not redo.**  
+Checklist: `docs/operations/PHASE_CHECKLIST_79_166.md` — **80 DONE / 8 PARTIAL** after the 24 Sept re-grade. Everything runs on seeded demo data; the PARTIAL rows name what is missing (ingestion, persistence, roles, real weather). Do not redo the DONE rows.  
 Run: `python -m agri_edge.ops.api` → http://127.0.0.1:8765/ops/
