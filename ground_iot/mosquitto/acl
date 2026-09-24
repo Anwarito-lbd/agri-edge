@@ -1,0 +1,23 @@
+# Who may publish and subscribe to what. Topic shape: docs/MQTT_CONTRACT.md
+#   agriedge/farm/{farm}/zone/{zone}/{soil|weather|status|irrigation/...}
+#
+# Anything not granted here is denied.
+
+# Field sensor and pump nodes: report readings, receive irrigation commands.
+user sensor
+topic write agriedge/farm/+/zone/+/soil
+topic write agriedge/farm/+/zone/+/weather
+topic write agriedge/farm/+/zone/+/status
+topic write agriedge/farm/+/zone/+/irrigation/status
+topic read  agriedge/farm/+/zone/+/irrigation/set
+
+# The agri-edge backend: reads everything on the farm bus. It does not command
+# valves -- irrigation decisions are recommendations a human or Node-RED rule
+# turns into a command.
+user agriedge
+topic read agriedge/#
+
+# Node-RED owns the irrigation rules, so it is the one client allowed to
+# publish irrigation/set.
+user nodered
+topic readwrite agriedge/#

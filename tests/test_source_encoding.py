@@ -51,7 +51,8 @@ SKIP_PARTS = {".git", "vendor", "__pycache__", "node_modules", "runs",
               "weights", "data", "YOLOX_outputs", "YOLOX_outputs_crashed",
               ".venv", "venv", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
 TEXT_SUFFIXES = {".py", ".yaml", ".yml", ".json", ".md", ".sh", ".toml",
-                 ".cfg", ".ini", ".txt"}
+                 ".cfg", ".ini", ".txt", ".conf", ".html", ".sql", ".js",
+                 ".css", ".acl"}
 
 
 def _in_scope(path: Path) -> bool:
