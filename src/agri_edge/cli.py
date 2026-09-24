@@ -297,6 +297,36 @@ def cmd_preflight(args) -> int:
     return 0
 
 
+def cmd_satellite(args) -> int:
+    """Update one field's Sentinel-2 series and report change. Workstation /
+    ops-station command: needs network and rasterio (the `geo` extra)."""
+    from .satellite.service import update_field
+
+    boundary = json.loads(Path(args.boundary).read_text(encoding="utf-8"))
+    if boundary.get("type") == "FeatureCollection":
+        boundary = boundary["features"][0]
+    try:
+        out = update_field(args.db, args.field_id, boundary, start=args.since, end=args.until,
+                           max_cloud=args.max_cloud)
+    except OSError as exc:      # URLError is an OSError: no route, proxy refusal, DNS
+        print(f"Scene search failed: {exc}. The stored series is unchanged; "
+              "retry when the link is up.", file=sys.stderr)
+        return 2
+    ch = out["change"]
+    print(f"{args.field_id}: {out['searched']} scene(s) found, {len(out['added'])} new, "
+          f"{len(out['failed'])} failed")
+    for line in ch["why"]:
+        print("  " + line)
+    for i, p in enumerate(ch["patches"]):
+        m = p["mission"]
+        print(f"  patch {i}: {p['area_ha']} ha, worst {p['worst_residual']:+.2f} NDVI vs field -> "
+              f"{m['lines']} lines, {m['total_distance_m']} m")
+    if args.geojson:
+        Path(args.geojson).write_text(json.dumps(out["geojson"], indent=2), encoding="utf-8")
+        print(f"  wrote {args.geojson}")
+    return 0 if not out["failed"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="agri-edge",
@@ -345,6 +375,16 @@ def main(argv: list[str] | None = None) -> int:
     p_pre = sub.add_parser("preflight", help="Check the edge system before a flight.")
     p_pre.add_argument("--simulate", action="store_true", help="Skip the live telemetry check.")
     p_pre.set_defaults(func=cmd_preflight)
+
+    p_sat = sub.add_parser("satellite", help="Update a field's Sentinel-2 series; flag patches to scout.")
+    p_sat.add_argument("--field-id", required=True)
+    p_sat.add_argument("--boundary", required=True, help="GeoJSON Polygon / Feature of the field")
+    p_sat.add_argument("--db", default="data/satellite.sqlite")
+    p_sat.add_argument("--since", help="YYYY-MM-DD (default: 60 days before --until)")
+    p_sat.add_argument("--until", help="YYYY-MM-DD (default: today)")
+    p_sat.add_argument("--max-cloud", type=float, default=40.0)
+    p_sat.add_argument("--geojson", help="write flagged cells and scout patches here")
+    p_sat.set_defaults(func=cmd_satellite)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

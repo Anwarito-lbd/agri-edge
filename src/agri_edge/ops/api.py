@@ -32,7 +32,7 @@ from .odm import ODMPipelineStub
 from .map3d import scene, vr_status
 from .notifications import DashboardNotificationProvider, MultiplexNotificationProvider, LogNotificationProvider
 from .alerts import InvalidTransition
-from . import agronomy_service
+from . import agronomy_service, satellite_service
 from .ingest import detections_geojson, ingest, replay_ingest_log
 from .types import AlertState, utcnow, new_id
 
@@ -207,8 +207,20 @@ class OpsHandler(BaseHTTPRequestHandler):
                 except KeyError:
                     return _json(self, 404, {"error": f"unknown field {fid}"})
             if path == "/api/ops/recommendations":
+                recs = (agronomy_service.all_recommendations(store)
+                        + satellite_service.scouting_recommendations(store))
                 return _json(self, 200, {**_banner(store),
-                                         "recommendations": agronomy_service.all_recommendations(store)})
+                                         "recommendations": sorted(recs, key=lambda r: r["priority"])})
+            if path == "/api/ops/satellite":
+                fid = (qs.get("field") or [""])[0]
+                if not fid:
+                    raise BadRequest("field is required")
+                try:
+                    return _json(self, 200, {**_banner(store), **satellite_service.summary(store, fid)})
+                except KeyError:
+                    return _json(self, 404, {"error": f"unknown field {fid}"})
+                except ValueError as exc:
+                    return _json(self, 400, {"error": str(exc)})
             if path == "/api/ops/map/detections":
                 return _json(self, 200, {**_banner(store), **detections_geojson(store)})
             if path == "/api/ops/map/layers":
@@ -386,6 +398,13 @@ class OpsHandler(BaseHTTPRequestHandler):
                 prof = agronomy_service.upsert_field(store, body)
                 store.add_audit(body.get("actor", "operator"), "field_upsert", prof.field_id)
                 return _json(self, 200, {"field": prof.to_dict()})
+            if path == "/api/ops/satellite/refresh":
+                fid = str(body.get("field_id") or "")
+                try:
+                    started = satellite_service.refresh(store, fid)
+                except KeyError:
+                    return _json(self, 404, {"error": f"unknown field {fid}"})
+                return _json(self, 202, {"started": started, **satellite_service.status(fid)})
             if path == "/api/ops/ingest":
                 # One message {topic, payload} or a batch {messages: [...]}. The
                 # same function the MQTT subscriber calls (ops/ingest.py).
