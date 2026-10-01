@@ -78,6 +78,11 @@ class OpsStore:
         self.retention = RetentionPolicy()
         self.alerts = AlertEngine()
         self.simulation_mode = True  # §153–154 default for demo
+        # Messages accepted through ops/ingest.py since start (replay included).
+        self.live_messages = 0
+        # True while ops/ingest.replay_ingest_log rebuilds state: the log is the
+        # durable record, so replayed readings must not be written again.
+        self.replaying = False
         self.sqlite_path = sqlite_path
         if sqlite_path:
             self._init_sqlite(sqlite_path)
@@ -103,12 +108,22 @@ class OpsStore:
                 payload TEXT NOT NULL
             )"""
         )
+        # Every message accepted by ops/ingest.py, in arrival order. Replayed on
+        # startup; the per-kind tables above are derived views of it.
+        con.execute(
+            """CREATE TABLE IF NOT EXISTS ingest_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                received_at TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )"""
+        )
         con.commit()
         con.close()
 
     def persist_sensor(self, reading: SensorReading) -> None:
         self.sensor_readings.append(reading)
-        if not self.sqlite_path:
+        if not self.sqlite_path or self.replaying:
             return
         con = sqlite3.connect(self.sqlite_path)
         con.execute(
@@ -125,6 +140,8 @@ class OpsStore:
     def persist_detection(self, row: dict) -> None:
         """Persist a normalized detection dict (SIMULATED / SQLite when DATABASE_URL set)."""
         self.detections.append(row)
+        if self.replaying:
+            return
         from .db import get_detection_db
         db = get_detection_db()
         if db is not None:
@@ -132,7 +149,7 @@ class OpsStore:
 
     def persist_weather(self, obs: WeatherObservation) -> None:
         self.weather.append(obs)
-        if not self.sqlite_path:
+        if not self.sqlite_path or self.replaying:
             return
         con = sqlite3.connect(self.sqlite_path)
         con.execute(
@@ -159,6 +176,7 @@ class OpsStore:
         open_alerts = [a for a in self.alerts.list_alerts() if a.state.value in ("OPEN", "ACKNOWLEDGED", "ESCALATED")]
         return {
             "simulation": self.simulation_mode,
+            "live_messages": self.live_messages,
             "banner": "SIMULATION" if self.simulation_mode else None,
             "device_count": len(self.devices),
             "weather_count": len(self.weather),

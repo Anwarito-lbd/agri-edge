@@ -16,6 +16,7 @@ SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
 <a style="color:#b6f5b6" href="/ops/sensors.html">Sensors</a>
 <a style="color:#b6f5b6" href="/ops/alerts.html">Alerts</a>
 <a style="color:#b6f5b6" href="/ops/irrigation.html">Irrigation</a>
+<a style="color:#b6f5b6" href="/ops/recommendations.html">Recommendations</a>
 <a style="color:#b6f5b6" href="/ops/map3d.html">3D</a>
 </nav>
 <main>
@@ -23,13 +24,15 @@ SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
 <div id="content" class="card">Loading…</div>
 </main>
 <script>
-async function get(path){ const r=await fetch(path); return r.json(); }
+fetch('/api/ops/overview').then(r=>r.json()).then(o=>{if(!o.simulation){const b=document.getElementById('sim-banner');if(b)b.style.display='none';}}).catch(()=>{});
+async function get(path){ const r=await fetch(path); if(r.status===401){location.href='/ops/login.html';throw new Error('login required');} return r.json(); }
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 (async()=>{
   const i=await get('/api/ops/irrigation');
   const zones=(i.zones||[]);
-  const rows=zones.map(z=>`<tr><td>${z.zone_id}</td><td>${z.avg_moisture_pct??''}</td><td>${z.valve_id??''}</td><td>${z.valve_open_pct??''}</td><td>${z.flow_lpm??''}</td><td>${z.recommendation?.action??''}</td></tr>`).join('');
-  document.getElementById('content').innerHTML=`<h3>Zones</h3><table border=1 cellpadding=6 style="border-collapse:collapse;width:100%;background:#0a120a"><tr><th>Zone</th><th>Moisture %</th><th>Valve</th><th>Open %</th><th>Flow LPM</th><th>Rec</th></tr>${rows}</table><pre>${JSON.stringify(i,null,2)}</pre>
+  const rows=zones.map(z=>`<tr><td>${esc(z.zone_id)}</td><td>${esc(z.avg_moisture_pct??'')}</td><td>${esc(z.valve_id??'')}</td><td>${esc(z.valve_open_pct??'')}</td><td>${esc(z.flow_lpm??'')}</td><td>${esc(z.recommendation?.action??'')}</td></tr>`).join('');
+  document.getElementById('content').innerHTML=`<h3>Zones</h3><table border=1 cellpadding=6 style="border-collapse:collapse;width:100%;background:#0a120a"><tr><th>Zone</th><th>Moisture %</th><th>Valve</th><th>Open %</th><th>Flow LPM</th><th>Rec</th></tr>${rows}</table><pre>${esc(JSON.stringify(i,null,2))}</pre>
   <p>Safety: auto_execute=false · mqtt_ground_only · no AI unrestricted pump</p>`;
 })();
 

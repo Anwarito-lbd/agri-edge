@@ -45,6 +45,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 
 # Mean Earth radius (WGS-84 semi-major). Good to a few parts per thousand for the
 # local-tangent-plane approximation used here, which is far tighter than any
@@ -53,7 +54,7 @@ _EARTH_R_M = 6_378_137.0
 
 
 def project_to_local(
-    lats: np.ndarray, lons: np.ndarray, origin: tuple[float, float]
+    lats: npt.ArrayLike, lons: npt.ArrayLike, origin: tuple[float, float]
 ) -> np.ndarray:
     """Geographic degrees -> local ENU metres about `origin` (lat, lon).
 
@@ -173,7 +174,8 @@ class TreatmentGeofence:
     application over a neighbour's crop.
     """
 
-    def __init__(self, boundary_m: np.ndarray, treatment_buffer_m: float = 10.0):
+    def __init__(self, boundary_m: np.ndarray, treatment_buffer_m: float = 10.0,
+                 holes_m=()):
         poly = np.asarray(boundary_m, dtype=np.float64)
         if poly.ndim != 2 or poly.shape[1] != 2 or len(poly) < 3:
             raise ValueError(
@@ -189,6 +191,13 @@ class TreatmentGeofence:
             )
         self.boundary = poly
         self.treatment_buffer_m = float(treatment_buffer_m)
+        # Areas inside the field where application is never permitted -- a
+        # slough, a yard site, a well head. Each gets the same buffer as the
+        # outer edge. Flight over them is fine; treatment is not.
+        self.holes = [np.asarray(h, dtype=np.float64) for h in holes_m]
+        for h in self.holes:
+            if h.ndim != 2 or h.shape[1] != 2 or len(h) < 3:
+                raise ValueError(f"Each hole must be an (N, 2) ring in metres, got {h.shape}.")
 
     @property
     def area_m2(self) -> float:
@@ -205,22 +214,34 @@ class TreatmentGeofence:
     def may_fly(self, point: tuple[float, float]) -> bool:
         return point_in_polygon(point, self.boundary)
 
-    def may_treat(self, point: tuple[float, float]) -> bool:
-        """Inside the field AND at least `treatment_buffer_m` from its edge."""
-        if not self.may_fly(point):
-            return False
-        return distance_to_boundary_m(point, self.boundary) >= self.treatment_buffer_m
+    def may_treat(self, point: tuple[float, float], position_error_m: float = 0.0) -> bool:
+        """Inside the field, outside every hole, and at least `treatment_buffer_m`
+        from all of those edges -- widened by `position_error_m`.
+
+        The point is where we THINK the target is. A detection georeferenced to
+        +/- 4 m that sits 12 m inside a 10 m buffer may really be 8 m inside it,
+        so the uncertainty is spent out of the margin rather than ignored.
+        """
+        if position_error_m < 0:
+            raise ValueError("position_error_m must be >= 0")
+        return self.treatment_margin_m(point) >= position_error_m
 
     def treatment_margin_m(self, point: tuple[float, float]) -> float:
         """Metres of buffer remaining. Negative once application must be off.
 
         Useful as a continuous signal: a planner can begin closing valves as this
         approaches zero rather than waiting for the boolean to flip, which is what
-        a real system needs given valve actuation time.
+        a real system needs given valve actuation time. Holes count: the margin is
+        the smallest over the outer edge and every hole's edge.
         """
         d = distance_to_boundary_m(point, self.boundary)
         if not self.may_fly(point):
             d = -d
+        for hole in self.holes:
+            dh = distance_to_boundary_m(point, hole)
+            if point_in_polygon(point, hole):
+                dh = -dh
+            d = min(d, dh)
         return d - self.treatment_buffer_m
 
 
@@ -266,12 +287,23 @@ def load_boundary_geojson(path, origin: tuple[float, float] | None = None):
     is a Polygon -- all three are what mapping tools actually export, and
     rejecting two of them would just mean the user edits the file by hand.
 
-    Only the OUTER ring is used. Holes (a slough, a yard site) are silently
-    ignored rather than half-supported, and that is stated here because a hole
-    the code ignores is a place it would wrongly permit treatment.
+    Only the OUTER ring is returned -- right for flight and coverage planning,
+    WRONG for treatment: a hole (a slough, a yard site) is a place application
+    must stay off. Treatment callers use `load_treatment_boundary`, which keeps
+    the holes.
 
     The origin defaults to the first vertex, so all planning happens in metres
     about the field itself. Returns degrees nowhere.
+    """
+    outer, _holes, org = load_treatment_boundary(path, origin)
+    return outer, org
+
+
+def load_treatment_boundary(path, origin: tuple[float, float] | None = None):
+    """Read a GeoJSON Polygon: (outer ring, [hole rings], origin), in local metres.
+
+    Until 24 Sept 2026 the pipeline used the outer ring only, so treatment was
+    permitted inside a boundary's holes.
     """
     import json
 
@@ -290,15 +322,23 @@ def load_boundary_geojson(path, origin: tuple[float, float] | None = None):
             f"{path}: need a Polygon, got {geom.get('type')!r}. A treatment "
             "boundary must be an area, not a point or a line."
         )
-    ring = geom.get("coordinates", [[]])[0]
-    if len(ring) < 4:
-        raise ValueError(f"{path}: a polygon ring needs at least 4 positions.")
+    rings = geom.get("coordinates") or [[]]
+    for ring in rings:
+        if len(ring) < 4:
+            raise ValueError(f"{path}: a polygon ring needs at least 4 positions.")
 
-    # GeoJSON is [lon, lat]. Reversed, the field lands in the wrong hemisphere.
-    lons = [float(p[0]) for p in ring]
-    lats = [float(p[1]) for p in ring]
-    if ring[0] == ring[-1]:
-        lons, lats = lons[:-1], lats[:-1]   # drop the repeated closing vertex
+    def _latlon(ring):
+        # GeoJSON is [lon, lat]. Reversed, the field lands in the wrong hemisphere.
+        lons = [float(p[0]) for p in ring]
+        lats = [float(p[1]) for p in ring]
+        if ring[0] == ring[-1]:
+            lons, lats = lons[:-1], lats[:-1]   # drop the repeated closing vertex
+        return lats, lons
 
+    lats, lons = _latlon(rings[0])
     org = origin or (lats[0], lons[0])
-    return project_to_local(lats, lons, org), org
+    holes = []
+    for r in rings[1:]:
+        hlats, hlons = _latlon(r)
+        holes.append(project_to_local(hlats, hlons, org))
+    return project_to_local(lats, lons, org), holes, org

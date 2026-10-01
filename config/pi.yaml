@@ -10,9 +10,13 @@ site: field-trial
 field_id: plot-01
 
 capture:
-  # Camera Module 3 full resolution. Drop to (2028, 1520) for 2x2 binning if the
-  # Pi cannot keep up -- measure FPS first rather than guessing.
-  resolution: [4056, 3040]
+  # Camera Module 3 (IMX708) full resolution, 16:9. Drop to [2304, 1296] for
+  # 2x2 binning if the Pi cannot keep up -- measure FPS first rather than
+  # guessing. Keep 16:9: a 4:3 request crops the sensor, and then
+  # camera_geometry.sensor_width_mm no longer describes the image.
+  #
+  # Until 24 Sept 2026 this was [4056, 3040] -- the HQ camera's resolution.
+  resolution: [4608, 2592]
   interval_s: 1.0
   output_dir: ./data/raw
   max_telemetry_age_s: 2.0
@@ -81,7 +85,7 @@ inference:
   # TILED INFERENCE -- for small targets this is not an optimisation, it is the
   # difference between detectable and invisible.
   #
-  # Letterboxing a 4056-wide frame to 640x640 discards 6.3x of linear resolution
+  # Letterboxing a 4608-wide frame to 640x640 discards 7.2x of linear resolution
   # BEFORE the detector runs. A 3 cm weed seedling is then sub-pixel at any
   # useful altitude. Tiling slices the frame at native resolution instead.
   #
@@ -92,8 +96,8 @@ inference:
   # Run training/gsd_calculator.py for your camera and target size.
   # Measured 2.3x more detections than whole-frame on real test imagery.
   #
-  # Cost: one inference per tile. A 4056x3040 frame at tile 640 / overlap 0.2 is
-  # ~56 tiles. On the Pi CPU that is far too slow -- use the Hailo backend, or
+  # Cost: one inference per tile. A 4608x2592 frame at tile 640 / overlap 0.2 is
+  # 45 tiles. On the Pi CPU that is far too slow -- use the Hailo backend, or
   # lower capture.resolution, before enabling this in flight.
   tiled: false
   tile_size: 640
@@ -107,7 +111,7 @@ inference:
 # ground position by a constant, which looks exactly like a GNSS offset.
 camera_geometry:
   enabled: false
-  sensor_width_mm: 7.4      # Pi Camera Module 3 (IMX708)
+  sensor_width_mm: 6.45     # IMX708 active width (4608 px x 1.4 um), NOT the 7.4 mm diagonal
   focal_length_mm: 4.74
   # Camera rotation on the airframe, clockwise from "top of image at the nose".
   # 90 for a camera bolted on sideways. Wrong here rotates an entire flight.
@@ -170,3 +174,15 @@ mavlink:
   connection: udpin:0.0.0.0:14550
   source_system: 200
   heartbeat_timeout_s: 5.0
+
+# Live reports to the farm's ops station (iot/edge_publisher.py). Best effort:
+# the spool stays the record. Credentials come from the environment
+# (OPS_API_TOKEN for http, MQTT_USERNAME / MQTT_PASSWORD for mqtt).
+publish:
+  enabled: false
+  transport: mqtt          # mqtt | http
+  mqtt_host: 192.168.1.10
+  mqtt_port: 1883
+  farm_id: farm
+  vehicle_id: scout1
+  health_every_frames: 10

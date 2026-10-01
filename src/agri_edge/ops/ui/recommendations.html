@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>Recommendations — Agri-Edge Ops</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;background:#0f1a0f;color:#e8f0e8;}
+main{padding:16px;max-width:1100px;margin:0 auto;}
+.card{background:#182818;border:1px solid #2d4a2d;border-radius:8px;padding:14px;margin:10px 0;}
+pre{background:#0a120a;padding:10px;overflow:auto;border-radius:6px;font-size:12px;}
+h1{font-size:1.4rem;} button{padding:8px 12px;cursor:pointer;}
+</style></head><body>
+<div id="sim-banner" style="background:#c45c00;color:#fff;padding:10px 16px;font-weight:700;letter-spacing:1px;text-align:center;">
+SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
+</div><nav style="display:flex;gap:12px;padding:12px;background:#1a2e1a;flex-wrap:wrap;">
+<a style="color:#b6f5b6" href="/ops/">Overview</a>
+<a style="color:#b6f5b6" href="/ops/map.html">Map</a>
+<a style="color:#b6f5b6" href="/ops/live.html">Live</a>
+<a style="color:#b6f5b6" href="/ops/weather.html">Weather</a>
+<a style="color:#b6f5b6" href="/ops/sensors.html">Sensors</a>
+<a style="color:#b6f5b6" href="/ops/alerts.html">Alerts</a>
+<a style="color:#b6f5b6" href="/ops/irrigation.html">Irrigation</a>
+<a style="color:#b6f5b6" href="/ops/recommendations.html">Recommendations</a>
+</nav>
+<main>
+<h1>Recommendations</h1>
+<p>Decision support, not decisions. Each item says why, what it could not see, and what its data rests on.</p>
+<div id="content">Loading…</div>
+</main>
+<script>
+fetch('/api/ops/overview').then(r=>r.json()).then(o=>{if(!o.simulation){const b=document.getElementById('sim-banner');if(b)b.style.display='none';}}).catch(()=>{});
+async function get(path){ const r=await fetch(path); if(r.status===401){location.href='/ops/login.html';throw new Error('login required');} return r.json(); }
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+const PRI={1:'Act now',2:'This week',3:'For information'};
+(async()=>{
+  const r=await get('/api/ops/recommendations');
+  const recs=r.recommendations||[];
+  if(!recs.length){document.getElementById('content').innerHTML='<div class="card">No fields yet. POST /api/ops/fields to add one.</div>';return;}
+  const card=x=>{
+    const items=x.why.map(w=>'<li>'+esc(w)+'</li>').join('');
+    const extra=x.missing.length?' · Not known: '+esc(x.missing.join('; ')):'';
+    return `<div class="card"><b>${esc(PRI[x.priority])} · ${esc(x.field_id)} · ${esc(x.title)}</b>
+<p>${esc(x.action)}</p><ul>${items}</ul>
+<small>Confidence: ${esc(x.confidence)} · Data: ${esc(x.sources.join(', '))}${extra}</small></div>`;
+  };
+  document.getElementById('content').innerHTML=recs.map(card).join('');
+})();
+</script>
+</body></html>

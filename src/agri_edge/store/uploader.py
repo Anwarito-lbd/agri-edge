@@ -178,7 +178,16 @@ class Uploader:
             pending = pending[:limit]
 
         consecutive_failures = 0
+        lost: list[str] = []
         for entry in pending:
+            if not (self.spool.dir / entry.meta_path).exists():
+                # The sidecar is gone (evicted, or deleted by hand). That is a
+                # fact about this entry, not about the link, so it must not
+                # count towards "the link is down" -- it used to, and three
+                # such entries stopped every upload pass for good.
+                lost.append(entry.entry_id)
+                result.errors.append(f"{entry.entry_id}: sidecar missing; dropped from queue")
+                continue
             result.attempted += 1
             try:
                 sent = self._post(entry)
@@ -199,6 +208,9 @@ class Uploader:
             result.succeeded += 1
             result.bytes_sent += sent
             result.uploaded_ids.append(entry.entry_id)
+
+        if lost:
+            self.spool.mark_evicted(lost)
 
         # Mark in one batch: a single index rewrite rather than one per frame.
         if result.uploaded_ids:

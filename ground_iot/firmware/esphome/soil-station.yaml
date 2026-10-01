@@ -1,0 +1,131 @@
+# agri-edge soil station: ESP32, two capacitive moisture probes (10 and 30 cm),
+# one DS18B20 soil temperature string, battery monitor, deep sleep.
+#
+# Wake every 15 min, read, publish ONE JSON message on
+#   agriedge/farm/<farm>/zone/<zone>/soil
+# in the shape docs/MQTT_CONTRACT.md defines, then sleep. The ops station
+# ingests it as-is (ops/ingest.py).
+#
+# Credentials: per device. `python -m agri_edge.iot.provision add <id> --farm
+# <farm> --zone <zone> --kind soil` prints the secrets.yaml for this device.
+#
+# CALIBRATE the probes before trusting a number: record the ADC voltage in
+# air (dry_v) and in a glass of water (wet_v) for EACH probe, then in the
+# field soil at a known moisture if you can. Capacitive probes differ unit to
+# unit; the defaults below are placeholders.
+
+substitutions:
+  device_id: soil-01
+  farm: farm
+  zone: z1
+  dry_v_10: "2.60"
+  wet_v_10: "1.10"
+  dry_v_30: "2.60"
+  wet_v_30: "1.10"
+  sleep_minutes: "15"
+
+esphome:
+  name: ${device_id}
+  on_boot:
+    priority: -100
+    then:
+      - wait_until:
+          condition:
+            mqtt.connected:
+          timeout: 30s
+      - delay: 3s              # let every sensor take a reading
+      - script.execute: publish_and_sleep
+
+esp32:
+  board: esp32dev
+
+logger:
+  level: WARN
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  client_id: ${device_id}
+  discovery: false
+  # No birth/will on shared topics: this device may only write its own zone.
+  birth_message:
+  will_message:
+
+deep_sleep:
+  id: sleeper
+  sleep_duration: ${sleep_minutes}min
+
+one_wire:
+  - platform: gpio
+    pin: GPIO4
+
+sensor:
+  - platform: adc
+    id: moist_10
+    pin: GPIO34
+    attenuation: 12db
+    update_interval: 1s
+    filters:
+      - median: {window_size: 5, send_every: 5}
+      - lambda: |-
+          float pct = (${dry_v_10} - x) / (${dry_v_10} - ${wet_v_10}) * 100.0;
+          return pct < 0 ? 0 : (pct > 100 ? 100 : pct);
+  - platform: adc
+    id: moist_30
+    pin: GPIO35
+    attenuation: 12db
+    update_interval: 1s
+    filters:
+      - median: {window_size: 5, send_every: 5}
+      - lambda: |-
+          float pct = (${dry_v_30} - x) / (${dry_v_30} - ${wet_v_30}) * 100.0;
+          return pct < 0 ? 0 : (pct > 100 ? 100 : pct);
+  - platform: dallas_temp
+    id: temp_10
+    index: 0
+    update_interval: 1s
+  - platform: dallas_temp
+    id: temp_30
+    index: 1
+    update_interval: 1s
+  - platform: adc
+    id: battery_v
+    pin: GPIO33
+    attenuation: 12db
+    update_interval: 1s
+    filters:
+      - multiply: 2.0          # 1:1 divider on the battery
+  - platform: wifi_signal
+    id: rssi
+    update_interval: 1s
+
+script:
+  - id: publish_and_sleep
+    then:
+      - mqtt.publish_json:
+          topic: agriedge/farm/${farm}/zone/${zone}/soil
+          qos: 1
+          payload: |-
+            root["schema_version"] = 1;
+            root["device_id"] = "${device_id}";
+            // LiPo: 3.3 V empty .. 4.2 V full, linear is good enough for an alarm.
+            float b = (id(battery_v).state - 3.3) / 0.9 * 100.0;
+            root["battery_pct"] = b < 0 ? 0 : (b > 100 ? 100 : b);
+            root["rssi"] = id(rssi).state;
+            JsonArray depths = root["depths"].to<JsonArray>();
+            JsonObject d10 = depths.add<JsonObject>();
+            d10["depth_cm"] = 10;
+            if (!isnan(id(moist_10).state)) d10["moisture_pct"] = id(moist_10).state;
+            if (!isnan(id(temp_10).state)) d10["temp_c"] = id(temp_10).state;
+            JsonObject d30 = depths.add<JsonObject>();
+            d30["depth_cm"] = 30;
+            if (!isnan(id(moist_30).state)) d30["moisture_pct"] = id(moist_30).state;
+            if (!isnan(id(temp_30).state)) d30["temp_c"] = id(temp_30).state;
+      - delay: 1s              # QoS 1 needs the PUBACK before the radio goes off
+      - deep_sleep.enter: sleeper

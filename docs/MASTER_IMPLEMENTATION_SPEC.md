@@ -49,13 +49,13 @@ Implementation + tests + docs + no secrets. Hardware tasks need explicit VALIDAT
 | 5 | Live camera on Pi | **BLOCKED-HARDWARE** | Capture scripts exist; no device this wave |
 | 6 | Normalized Detection API | **DONE** | `src/agri_edge/detection/` — Detection + DetectionBackend + CpuOnnx/Hailo/Simulated |
 | 6b | Model registry | **DONE** | `src/agri_edge/ai/registry.py` + `ai/model_registry/registry.json` |
-| 7 | MQTT vehicle + ground | **DONE** (prior) | Topics + bridge; irrigation ground MQTT only |
+| 7 | MQTT vehicle + ground | **PARTIAL** | Topic helpers, bridge class, ACL'd broker. No edge publisher; bridge not wired to the store (audit 2026-09-24) |
 | 8 | Backend SQLite/PostGIS | **DONE** / PostGIS schema **SIMULATED** | `src/agri_edge/ops/db.py` sensors+detections; `docs/operations/schema_postgis.sql`; `/api/ops/detections` |
 | 9 | Dashboard decisions UI | **PARTIAL** (prior Ops Station) | Ops UI Release-1; not reworked this wave |
 | 10 | VehicleAdapter + ArduPilot stub | **DONE** (SIMULATED cmds) | `src/agri_edge/vehicle/` fail-closed; SITL `scripts/sitl.sh` kept |
 | CI | Makefile `test`/`lint` + GHA | **DONE** | `Makefile`, `.github/workflows/test.yml` |
 | Licences | `third_party/manifest.yaml` | **DONE** | + NOTICE.md pointer |
-| Ops Station §79–166 | **DONE 88/88** | Do not redo | `docs/operations/PHASE_CHECKLIST_79_166.md` |
+| Ops Station §79–166 | **80 DONE / 8 PARTIAL** | Re-graded 2026-09-24; demo data only | `docs/operations/PHASE_CHECKLIST_79_166.md` |
 
 ### Explicitly BLOCKED-HARDWARE (this wave)
 - Live camera on Pi

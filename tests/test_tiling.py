@@ -269,3 +269,19 @@ class TestConfigWiring:
 
     def test_none_engine_stays_none(self):
         assert maybe_wrap_tiled(None, InferenceConfig(tiled=True)) is None
+
+
+class _CollapsingEngine(FixedDetectionEngine):
+    def infer(self, image):
+        d = super().infer(image)[0]
+        d.label, d.source_label = "weed", "kochia"
+        return [d]
+
+
+def test_tiling_keeps_the_source_label():
+    """Audit 24 Sept, F15: tiling rebuilt each Detection and dropped
+    `source_label`, erasing what the network predicted under a collapsed label."""
+    dets = TiledEngine(_CollapsingEngine(), tile_size=640).infer(
+        np.zeros((1280, 1280, 3), dtype=np.uint8)
+    )
+    assert dets and all(d.label == "weed" and d.source_label == "kochia" for d in dets)

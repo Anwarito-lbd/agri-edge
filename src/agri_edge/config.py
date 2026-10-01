@@ -54,7 +54,8 @@ class CameraGeometry:
     far the real ground may sit from the flat plane the projection assumes.
     """
 
-    sensor_width_mm: float = 7.4
+    # IMX708 active width: 4608 px x 1.4 um. Not 7.4 mm -- that is the diagonal.
+    sensor_width_mm: float = 6.45
     focal_length_mm: float = 4.74
     yaw_offset_deg: float = 0.0
     terrain_uncertainty_m: float = 2.0
@@ -96,7 +97,8 @@ class QAConfig:
 
 @dataclass
 class CaptureConfig:
-    resolution: tuple[int, int] = (4056, 3040)
+    # Camera Module 3 (IMX708) full resolution, 16:9. See config/pi.yaml.
+    resolution: tuple[int, int] = (4608, 2592)
     interval_s: float = 2.0
     output_dir: Path = Path("./data/raw")
     # Refuse to capture if the autopilot has not reported a position this recently.
@@ -226,6 +228,32 @@ class MavlinkConfig:
 
 
 @dataclass
+class PublishConfig:
+    """Live reports from the aircraft to the farm's ops station.
+
+    Best effort, and never in the way of capture: the spool stays the record
+    and uploads what the live link missed. Off by default -- most flights have
+    no link at all.
+
+    `transport: http` posts to the ops API's /api/ops/ingest (token from the
+    OPS_API_TOKEN environment variable). `transport: mqtt` publishes to the
+    broker (MQTT_USERNAME / MQTT_PASSWORD from the environment, never from
+    this file).
+    """
+
+    enabled: bool = False
+    transport: str = "http"             # http | mqtt
+    endpoint: str = "http://127.0.0.1:8765"
+    mqtt_host: str = "127.0.0.1"
+    mqtt_port: int = 1883
+    mqtt_tls: bool = False
+    farm_id: str = "farm"
+    vehicle_id: str = "scout1"
+    timeout_s: float = 3.0
+    health_every_frames: int = 10
+
+
+@dataclass
 class Config:
     site: str = "unnamed-site"
     field_id: str = "unnamed-field"
@@ -237,6 +265,7 @@ class Config:
     spool: SpoolConfig = field(default_factory=SpoolConfig)
     farmos: FarmOSSettings = field(default_factory=FarmOSSettings)
     mavlink: MavlinkConfig = field(default_factory=MavlinkConfig)
+    publish: PublishConfig = field(default_factory=PublishConfig)
 
     @classmethod
     def load(cls, path: str | Path) -> "Config":
@@ -279,6 +308,7 @@ class Config:
             spool=sub(SpoolConfig, "spool"),
             farmos=sub(FarmOSSettings, "farmos"),
             mavlink=sub(MavlinkConfig, "mavlink"),
+            publish=sub(PublishConfig, "publish"),
         )
 
     def to_dict(self) -> dict[str, Any]:

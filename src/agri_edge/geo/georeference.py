@@ -107,8 +107,12 @@ class CameraIntrinsics:
 
 
 # Pi Camera Module 3, the baseline for this project.
+# IMX708 active array: 4608 x 2592 at 1.4 um = 6.45 x 3.63 mm. The figures
+# used until 24 Sept 2026 -- 4056 x 3040 and 7.4 mm -- were the HQ camera's
+# (IMX477) resolution and the IMX708's DIAGONAL, which made every ground
+# offset from frame centre ~15% too large.
 IMX708 = CameraIntrinsics(
-    sensor_width_mm=7.4, focal_length_mm=4.74, image_width_px=4056, image_height_px=3040
+    sensor_width_mm=6.45, focal_length_mm=4.74, image_width_px=4608, image_height_px=2592
 )
 
 
@@ -331,9 +335,21 @@ def georeference_detections(
             d.geo_error = "no usable AGL altitude"
         return detections
 
-    yaw = telemetry.yaw_deg if telemetry.yaw_deg is not None else 0.0
-    roll = telemetry.roll_deg or 0.0
-    pitch = telemetry.pitch_deg or 0.0
+    # A missing heading used to become 0 (north) and missing roll/pitch became
+    # level. Heading is the worst of the three: at 100 m AGL a point 20 m off
+    # centre lands 40 m away when the true heading is south -- a rotated,
+    # entirely plausible map. Unknown is refused, not guessed.
+    missing = [name for name, value in (("heading", telemetry.yaw_deg),
+                                        ("roll", telemetry.roll_deg),
+                                        ("pitch", telemetry.pitch_deg))
+               if value is None]
+    if missing:
+        for d in detections:
+            d.geo_error = f"no {'/'.join(missing)} in telemetry"
+        return detections
+    yaw = telemetry.yaw_deg
+    roll = telemetry.roll_deg
+    pitch = telemetry.pitch_deg
 
     for d in detections:
         x1, y1, x2, y2 = d.bbox

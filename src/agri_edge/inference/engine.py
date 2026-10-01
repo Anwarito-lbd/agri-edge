@@ -20,9 +20,11 @@ whatever would act on it.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 from pathlib import Path
 
 import numpy as np
@@ -127,12 +129,40 @@ class ModelMetadata:
 
     @classmethod
     def load_beside(cls, model_path: Path) -> "ModelMetadata":
+        """Read `<model>.meta.json`, then decide what may be believed about it.
+
+        * If the meta records a `sha256` and the file does not match, refuse to
+          load: the weights are not the ones the metadata describes.
+        * `validated_locally` is taken from a passing local validation report
+          whose model_sha256 matches THIS file (learning/validate.py) -- never
+          from the meta flag alone. Until 24 Sept 2026 a hand-edited `true` in a
+          JSON file was all it took.
+        """
         meta_path = model_path.with_suffix(model_path.suffix + ".meta.json")
         if not meta_path.exists():
             return cls(name=model_path.stem, validation_notes="No metadata file found.")
         raw = json.loads(meta_path.read_text(encoding="utf-8"))
         known = {f for f in cls.__dataclass_fields__}
-        return cls(**{k: v for k, v in raw.items() if k in known})
+        meta = cls(**{k: v for k, v in raw.items() if k in known})
+        if not model_path.exists():
+            meta.validated_locally = False
+            return meta
+        from ..learning.validate import sha256_file, trust_for
+
+        expected = raw.get("sha256")
+        if expected and sha256_file(model_path) != expected:
+            raise RuntimeError(
+                f"{model_path.name}: sha256 does not match its meta.json. The file is not the "
+                "model the metadata describes; refusing to load it."
+            )
+        from ..ai.validation import load_reports
+
+        trust = trust_for(model_path, meta.validated_locally, load_reports())
+        if meta.validated_locally and not trust.validated_locally:
+            log.warning("%s: %s", model_path.name, trust.reason)
+        meta.validated_locally = trust.validated_locally
+        meta.validation_notes = (meta.validation_notes + " | " if meta.validation_notes else "") + trust.reason
+        return meta
 
 
 class InferenceEngine:
@@ -342,6 +372,88 @@ class OnnxEngine(InferenceEngine):
         )
 
 
+def _hailo_nms_per_class(raw) -> list:
+    """Normalise HailoRT's NMS-by-class output to one list of boxes per class.
+
+    `InferVStreams.infer` returns, for an NMS output, a list over the batch of
+    a list over classes of `(n_i, 5)` float arrays -- n_i differs per class.
+    That is a RAGGED structure: `np.asarray` on it raises ValueError on NumPy
+    >= 1.24 as soon as two classes hold different numbers of boxes, i.e. on the
+    first frame with any detection. The previous code did exactly that.
+    """
+    if isinstance(raw, np.ndarray) and raw.dtype != object:
+        # Already dense: (classes, n, 5) or (batch, classes, n, 5).
+        return list(raw[0]) if raw.ndim == 4 else list(raw)
+    seq = list(raw)
+    if len(seq) == 1 and not _is_box_array(seq[0]):
+        return list(seq[0])  # unwrap the batch of one
+    return seq
+
+
+def _is_box_array(x) -> bool:
+    """A numeric (n, 5) array of boxes, as opposed to a container of them."""
+    return isinstance(x, np.ndarray) and x.dtype != object and x.ndim == 2
+
+
+def decode_hailo_nms(
+    raw,
+    *,
+    input_size: tuple[int, int],
+    original_shape: tuple[int, int],
+    ratio: float,
+    class_names: list[str],
+    confidence_threshold: float,
+    validated_locally: bool,
+    collapse_to: str | None = None,
+) -> list[Detection]:
+    """Decode a .hef whose NMS ran on the NPU. Pure numpy; testable off-device.
+
+    Each box is `[y_min, x_min, y_max, x_max, score]`, normalised to the
+    letterboxed input -- note the y-first ordering, not the xyxy used everywhere
+    else here.
+    """
+    ih, iw = input_size
+    oh, ow = original_shape
+    dets: list[Detection] = []
+    for class_id, boxes in enumerate(_hailo_nms_per_class(raw)):
+        arr = np.asarray(boxes, dtype=np.float32).reshape(-1, 5) if np.size(boxes) else ()
+        for box in arr:
+            y0, x0, y1, x1, score = (float(v) for v in box[:5])
+            if score < confidence_threshold:
+                continue
+            # normalised-in-letterbox -> input pixels -> original -> normalised
+            px = np.array([x0 * iw, y0 * ih, x1 * iw, y1 * ih]) / ratio
+            predicted = class_names[class_id] if class_id < len(class_names) else f"class_{class_id}"
+            dets.append(
+                Detection(
+                    label=collapse_to or predicted,
+                    confidence=score,
+                    bbox=(
+                        float(np.clip(px[0] / ow, 0, 1)),
+                        float(np.clip(px[1] / oh, 0, 1)),
+                        float(np.clip(px[2] / ow, 0, 1)),
+                        float(np.clip(px[3] / oh, 0, 1)),
+                    ),
+                    validated_locally=validated_locally,
+                    source_label=predicted if collapse_to else None,
+                )
+            )
+    return dets
+
+
+def _is_nms_output(vstream_info) -> bool:
+    """Whether a Hailo output vstream carries post-NMS boxes.
+
+    Asked of the format order HailoRT reports, not guessed from the shape: the
+    old test `len(shape) != 2` called nearly every raw YOLOX head -- which is
+    (H, W, C), three dimensions -- an NMS output.
+    """
+    order = getattr(getattr(vstream_info, "format", None), "order", None)
+    if order is not None:
+        return "NMS" in str(order).upper()
+    return "nms" in str(getattr(vstream_info, "name", "")).lower()
+
+
 class HailoEngine(InferenceEngine):
     """Hailo NPU backend for the Raspberry Pi AI HAT+.
 
@@ -363,6 +475,7 @@ class HailoEngine(InferenceEngine):
             from hailo_platform import (
                 HEF,
                 ConfigureParams,
+                FormatType,
                 HailoStreamInterface,
                 InputVStreamParams,
                 OutputVStreamParams,
@@ -391,7 +504,16 @@ class HailoEngine(InferenceEngine):
         self._network_group = self._target.configure(self._hef, cfg)[0]
         self._ng_params = self._network_group.create_params()
         self._in_params = InputVStreamParams.make(self._network_group)
-        self._out_params = OutputVStreamParams.make(self._network_group)
+        # Dequantise on the host. The raw head is otherwise quantised uint8/16,
+        # and decoding those integers as if they were logits gives garbage.
+        self._out_params = OutputVStreamParams.make(
+            self._network_group, format_type=FormatType.FLOAT32
+        )
+        # Opened on the first infer() and kept open: activating the network
+        # group and building vstreams per call cost a full setup per frame --
+        # per TILE with tiled inference, 48 of them per frame.
+        self._session: contextlib.ExitStack | None = None
+        self._pipe: Any = None      # hailo_platform.InferVStreams, optional extra
 
         in_info = self._hef.get_input_vstream_infos()[0]
         self._input_name = in_info.name
@@ -402,7 +524,7 @@ class HailoEngine(InferenceEngine):
         self._output_name = out_infos[0].name
         # A .hef compiled with NMS baked in emits final boxes rather than the raw
         # head. Detect which we got once, here, instead of guessing per frame.
-        self._nms_on_device = len(out_infos[0].shape) != 2
+        self._nms_on_device = _is_nms_output(out_infos[0])
         log.info(
             "Hailo: %s, input %s, output %s, on-device NMS=%s",
             self.hef_path.name, self.input_size, out_infos[0].shape, self._nms_on_device,
@@ -420,15 +542,29 @@ class HailoEngine(InferenceEngine):
             chw.transpose(1, 2, 0)[None, ...].astype(np.uint8)
         )
 
-        with InferVStreams(self._network_group, self._in_params, self._out_params) as pipe:
-            with self._network_group.activate(self._ng_params):
-                results = pipe.infer({self._input_name: nhwc})
+        if self._pipe is None:
+            session = contextlib.ExitStack()
+            self._pipe = session.enter_context(
+                InferVStreams(self._network_group, self._in_params, self._out_params)
+            )
+            session.enter_context(self._network_group.activate(self._ng_params))
+            self._session = session
+        results = self._pipe.infer({self._input_name: nhwc})
 
-        raw = np.asarray(results[self._output_name])
+        out = results[self._output_name]
         if self._nms_on_device:
-            return self._decode_device_nms(raw, original_shape, ratio)
+            return decode_hailo_nms(
+                out,
+                input_size=self.input_size,
+                original_shape=original_shape,
+                ratio=ratio,
+                class_names=self.class_names,
+                confidence_threshold=self.confidence_threshold,
+                validated_locally=self.metadata.validated_locally,
+                collapse_to=self.collapse_labels_to,
+            )
         return detections_from_raw(
-            raw,
+            np.asarray(out, dtype=np.float32),
             original_shape=original_shape,
             ratio=ratio,
             input_size=self.input_size,
@@ -439,49 +575,11 @@ class HailoEngine(InferenceEngine):
             collapse_to=self.collapse_labels_to,
         )
 
-    def _decode_device_nms(
-        self, raw: np.ndarray, original_shape: tuple[int, int], ratio: float
-    ) -> list[Detection]:  # pragma: no cover - hardware
-        """Handle a .hef whose NMS ran on the NPU.
-
-        Output is per-class lists of `[y_min, x_min, y_max, x_max, score]`,
-        normalised to the letterboxed input -- note the y-first ordering, which is
-        not the xyxy used everywhere else here.
-        """
-        ih, iw = self.input_size
-        oh, ow = original_shape
-        dets: list[Detection] = []
-
-        per_class = raw[0] if raw.ndim > 1 and isinstance(raw[0], (list, np.ndarray)) else raw
-        for class_id, boxes in enumerate(per_class):
-            for box in np.atleast_2d(np.asarray(boxes)):
-                if box.size < 5:
-                    continue
-                y0, x0, y1, x1, score = (float(v) for v in box[:5])
-                if score < self.confidence_threshold:
-                    continue
-                # normalised-in-letterbox -> input pixels -> original -> normalised
-                px = np.array([x0 * iw, y0 * ih, x1 * iw, y1 * ih]) / ratio
-                dets.append(
-                    Detection(
-                        label=(
-                            self.class_names[class_id]
-                            if class_id < len(self.class_names)
-                            else f"class_{class_id}"
-                        ),
-                        confidence=score,
-                        bbox=(
-                            float(np.clip(px[0] / ow, 0, 1)),
-                            float(np.clip(px[1] / oh, 0, 1)),
-                            float(np.clip(px[2] / ow, 0, 1)),
-                            float(np.clip(px[3] / oh, 0, 1)),
-                        ),
-                        validated_locally=self.metadata.validated_locally,
-                    )
-                )
-        return dets
-
     def close(self) -> None:  # pragma: no cover - hardware
+        session = getattr(self, "_session", None)
+        if session is not None:
+            session.close()
+            self._session = self._pipe = None
         target = getattr(self, "_target", None)
         if target is not None:
             target.release()

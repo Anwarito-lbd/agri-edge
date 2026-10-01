@@ -43,16 +43,24 @@ def north_east_m(point, origin=(LAT, LON)):
 
 
 class TestIntrinsics:
+    # Until 24 Sept 2026 these pinned 7.4 mm across 4056 px: the IMX708's
+    # DIAGONAL and the HQ camera's resolution. The tests agreed with the code
+    # because both came from the same wrong numbers; the datasheet FOV did not
+    # (66 deg horizontal, 75 deg diagonal -- the old HFOV here was 76).
+
     def test_focal_px_is_derived_from_the_datasheet_numbers(self):
-        # 4.74 mm focal / 7.4 mm sensor across 4056 px
-        assert IMX708.focal_px == pytest.approx(4.74 * 4056 / 7.4)
+        # 4.74 mm focal / 6.45 mm active width across 4608 px (1.4 um pixels)
+        assert IMX708.focal_px == pytest.approx(4.74 * 4608 / 6.45)
+        assert IMX708.focal_px == pytest.approx(4.74 / 0.0014, rel=0.001)
 
     def test_gsd_matches_gsd_calculator(self):
-        """1.155 cm/px at 30 m -- the figure the product decision was made on."""
-        assert IMX708.gsd_m(30.0) * 100 == pytest.approx(1.155, abs=0.001)
+        """0.886 cm/px at 30 m (the old, wrong figure was 1.155)."""
+        assert IMX708.gsd_m(30.0) * 100 == pytest.approx(0.886, abs=0.001)
 
-    def test_hfov(self):
-        assert IMX708.hfov_deg == pytest.approx(76.0, abs=0.5)
+    def test_hfov_is_close_to_the_datasheet(self):
+        # Datasheet: 66 deg. 68.5 from nominal focal length; the difference is
+        # the lens's real focal length, which a checkerboard calibration fixes.
+        assert IMX708.hfov_deg == pytest.approx(68.5, abs=0.5)
 
     @pytest.mark.parametrize("kw", [
         {"sensor_width_mm": 0}, {"focal_length_mm": -1}, {"image_width_px": 0},
@@ -78,9 +86,9 @@ class TestNadir:
         ne = [north_east_m(p) for p in fp]
         width = max(e for _, e in ne) - min(e for _, e in ne)
         height = max(n for n, _ in ne) - min(n for n, _ in ne)
-        expect_w = (7.4 / 4.74) * ALT
+        expect_w = (6.45 / 4.74) * ALT
         assert width == pytest.approx(expect_w, rel=0.01)
-        assert height == pytest.approx(expect_w * 3040 / 4056, rel=0.01)
+        assert height == pytest.approx(expect_w * 2592 / 4608, rel=0.01)
 
     def test_top_of_frame_is_forward_when_heading_north(self):
         """Top of image points at the nose; nose points north."""
@@ -199,8 +207,8 @@ class TestErrorBudget:
         centre = ground_error_estimate_m(0.5, 0.5, IMX708, ALT)
         corner = ground_error_estimate_m(0.0, 0.0, IMX708, ALT)
         assert corner > centre
-        # ~44 deg off-nadir at the corner, so roughly dh * tan(44) ~ dh
-        assert corner == pytest.approx(2.0 * math.tan(math.radians(44.3)), abs=0.1)
+        # ~38 deg off-nadir at the corner (half the 75-76 deg diagonal FOV)
+        assert corner == pytest.approx(2.0 * math.tan(math.radians(38.0)), abs=0.1)
 
     def test_error_scales_with_terrain_uncertainty(self):
         a = ground_error_estimate_m(0.0, 0.0, IMX708, ALT, terrain_uncertainty_m=2.0)
@@ -209,7 +217,7 @@ class TestErrorBudget:
 
     def test_off_nadir_is_zero_at_centre_and_large_at_corner(self):
         assert off_nadir_deg(0.5, 0.5, IMX708) == pytest.approx(0.0, abs=1e-6)
-        assert off_nadir_deg(0.0, 0.0, IMX708) == pytest.approx(44.3, abs=0.5)
+        assert off_nadir_deg(0.0, 0.0, IMX708) == pytest.approx(38.0, abs=0.5)
 
 
 class TestRoundTrip:
@@ -270,6 +278,17 @@ class TestGeoreferenceDetections:
         georeference_detections([d], IMX708, self._telem(alt_rel_m=None))
         assert not d.has_position
         assert "altitude" in d.geo_error
+
+    @pytest.mark.parametrize("field,word", [("yaw_deg", "heading"),
+                                            ("roll_deg", "roll"),
+                                            ("pitch_deg", "pitch")])
+    def test_missing_attitude_is_refused_not_assumed(self, field, word):
+        """Audit 24 Sept, F9: a missing heading became 0 (north) and missing
+        roll/pitch became level, producing a rotated but plausible map."""
+        d = self._det(bbox=(0.1, 0.1, 0.2, 0.2))
+        georeference_detections([d], IMX708, self._telem(**{field: None}))
+        assert not d.has_position
+        assert word in d.geo_error
 
     def test_a_detection_on_the_sky_is_left_unplaced_with_a_reason(self):
         d = self._det(bbox=(0.4, 0.0, 0.6, 0.02))

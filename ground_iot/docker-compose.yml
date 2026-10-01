@@ -9,20 +9,27 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: agriedge-mosquitto
+    # Loopback only. Exposing the broker to the farm LAN is a decision, not a
+    # default: switch to the TLS listener in mosquitto.conf when you make it.
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "127.0.0.1:1883:1883"
+      - "127.0.0.1:9001:9001"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     restart: unless-stopped
 
   nodered:
-    image: nodered/node-red:latest
+    # Pinned: `latest` changes under you between two `up`s.
+    image: nodered/node-red:4.0
     container_name: agriedge-nodered
+    # The editor can deploy any flow, including one that publishes
+    # irrigation/set. Loopback only until adminAuth is set in settings.js.
     ports:
-      - "1880:1880"
+      - "127.0.0.1:1880:1880"
     environment:
       - TZ=America/Toronto
     volumes:

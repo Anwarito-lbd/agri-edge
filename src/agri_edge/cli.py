@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 from .capture.camera import build_camera
@@ -66,6 +67,9 @@ def cmd_fly(args) -> int:
     spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
     engine = build_engine(cfg.inference)
     environment = build_environment_sensor(cfg.capture, simulated=simulate_camera)
+    from .iot.edge_publisher import build_publisher
+
+    publisher = build_publisher(cfg.publish)
 
     if args.simulate:
         mode = "SIMULATED"
@@ -96,7 +100,8 @@ def cmd_fly(args) -> int:
             "  Detections are decision support only and must not drive treatment.\n"
         )
 
-    with Pipeline(cfg, camera, telemetry, spool, engine, environment) as pipeline:
+    with Pipeline(cfg, camera, telemetry, spool, engine, environment,
+                  publisher=publisher) as pipeline:
         stats = pipeline.run(duration_s=args.duration, max_frames=args.frames)
 
     print("\n--- run summary ---")
@@ -147,7 +152,7 @@ def cmd_spool(args) -> int:
         print("  sidecars only -- images stay spooled for the workstation.")
         farm_result = push_spool(spool, fcfg, limit=args.limit_uploads)
         print(json.dumps(farm_result.as_dict(), indent=2))
-        return 0 if farm_result.failed == 0 else 1
+        return 0 if farm_result.ok else 1
 
     if args.upload:
         from .store.uploader import build_uploader
@@ -262,7 +267,14 @@ def cmd_preflight(args) -> int:
         try:
             telemetry = build_telemetry_source(cfg.mavlink, simulated=False)
             telemetry.start()
+            # start() returns on the first heartbeat; position arrives on its
+            # own stream afterwards. Reading once, immediately, nearly always
+            # warned "no 3D position" on a perfectly healthy link.
+            deadline = time.monotonic() + 5.0
             snap = telemetry.snapshot()
+            while not snap.has_position and time.monotonic() < deadline:
+                time.sleep(0.2)
+                snap = telemetry.snapshot()
             telemetry.stop()
             if not snap.has_position:
                 warnings.append(f"no 3D position yet (fix: {snap.fix_name})")
@@ -283,6 +295,169 @@ def cmd_preflight(args) -> int:
     print("\nEdge preflight passed." + (" Review warnings." if warnings else ""))
     print("This is not an aviation preflight. See docs/briefs/04-compliance-checklist.md.")
     return 0
+
+
+def cmd_satellite(args) -> int:
+    """Update one field's Sentinel-2 series and report change. Workstation /
+    ops-station command: needs network and rasterio (the `geo` extra)."""
+    from .satellite.service import update_field
+
+    boundary = json.loads(Path(args.boundary).read_text(encoding="utf-8"))
+    if boundary.get("type") == "FeatureCollection":
+        boundary = boundary["features"][0]
+    try:
+        out = update_field(args.db, args.field_id, boundary, start=args.since, end=args.until,
+                           max_cloud=args.max_cloud)
+    except OSError as exc:      # URLError is an OSError: no route, proxy refusal, DNS
+        print(f"Scene search failed: {exc}. The stored series is unchanged; "
+              "retry when the link is up.", file=sys.stderr)
+        return 2
+    ch = out["change"]
+    print(f"{args.field_id}: {out['searched']} scene(s) found, {len(out['added'])} new, "
+          f"{len(out['failed'])} failed")
+    for line in ch["why"]:
+        print("  " + line)
+    for i, p in enumerate(ch["patches"]):
+        m = p["mission"]
+        print(f"  patch {i}: {p['area_ha']} ha, worst {p['worst_residual']:+.2f} NDVI vs field -> "
+              f"{m['lines']} lines, {m['total_distance_m']} m")
+    if args.geojson:
+        Path(args.geojson).write_text(json.dumps(out["geojson"], indent=2), encoding="utf-8")
+        print(f"  wrote {args.geojson}")
+    return 0 if not out["failed"] else 1
+
+
+def cmd_prescription(args) -> int:
+    """Spot-spray prescription from the spool's georeferenced detections.
+
+    Approval is part of the command, not a separate flag to forget: without
+    --approve-as and a measured --wind-ms nothing is written.
+    """
+    from .ai.validation import validated_models
+    from .prescription.export import approve, export_zip
+    from .prescription.grid import DetectionPoint, spot_spray
+
+    cfg = _load_config(args.config)
+    boundary = json.loads(Path(args.boundary).read_text(encoding="utf-8"))
+    if boundary.get("type") == "FeatureCollection":
+        boundary = boundary["features"][0]
+    if boundary.get("type") == "Feature":
+        boundary = boundary["geometry"]
+    spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
+    dets = []
+    for entry in spool.entries(include_uploaded=True):
+        try:
+            meta = json.loads((spool.dir / entry.meta_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        model = meta.get("model") or {}
+        for d in meta.get("detections") or []:
+            if d.get("lat") is None:
+                continue
+            dets.append(DetectionPoint(d["lat"], d["lon"], d.get("label", "weed"),
+                                       float(d.get("confidence", 0)), float(d.get("position_error_m") or 0),
+                                       (str(model.get("name")), str(model.get("version")))))
+    g = spot_spray(args.field_id, boundary, dets, rate=args.rate, product=args.product,
+                   unit=args.unit, cell_m=args.cell_m, buffer_m=args.buffer_m,
+                   validated_models=validated_models())
+    print(json.dumps(g.summary(), indent=2))
+    if not (args.approve_as and args.out):
+        print("Not exported: pass --approve-as NAME, --wind-ms and --out to approve and write it.")
+        return 1
+    result = approve(g, args.approve_as, args.wind_ms)
+    if not result["approved"]:
+        print("NOT APPROVED:\n  " + "\n  ".join(result["issues"]), file=sys.stderr)
+        return 1
+    Path(args.out).write_bytes(export_zip(g, boundary, args.format, field_name=args.field_id))
+    print(f"Wrote {args.out} ({args.format}), approved by {args.approve_as}.")
+    return 0
+
+
+def cmd_walk(args) -> int:
+    """Capture training imagery on foot: camera on a pole, USB GNSS, no aircraft."""
+    from .telemetry.nmea import NmeaTelemetry
+
+    cfg = _load_config(args.config)
+    telemetry = NmeaTelemetry(args.gps, args.baud, pole_height_m=args.pole_height)
+    camera = build_camera(cfg.capture, simulated=False, bands=["red", "green", "blue"])
+    spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
+    engine = build_engine(cfg.inference)
+    print(f"WALK mode: pole {args.pole_height} m, GNSS {args.gps}. Frames are tagged "
+          "capture_mode=walk and are for labelling, not mapping.")
+    with Pipeline(cfg, camera, telemetry, spool, engine, capture_mode="walk") as pipeline:
+        stats = pipeline.run(duration_s=args.duration, max_frames=args.frames)
+    print(json.dumps(stats.as_dict(), indent=2))
+    return 0
+
+
+def _spool_frames(spool: Spool) -> list[tuple[dict, dict]]:
+    out = []
+    for e in spool.entries(include_uploaded=True):
+        try:
+            meta = json.loads((spool.dir / e.meta_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        out.append((e.to_dict(), meta))
+    return out
+
+
+def cmd_label_export(args) -> int:
+    from .learning.labelstudio import export_tasks, label_config
+    from .learning.selection import select
+
+    cfg = _load_config(args.config)
+    spool = Spool(cfg.spool.spool_dir, cfg.spool.max_bytes)
+    frames = _spool_frames(spool)
+    by_id = {e["entry_id"]: e for e, _ in frames}
+    chosen = select([(e["entry_id"], m) for e, m in frames], args.n, seed=args.seed)
+    out = Path(args.out)
+    tasks = export_tasks(spool.dir, [by_id[c.entry_id] for c in chosen], out)
+    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    (out / "label_config.xml").write_text(label_config(classes), encoding="utf-8")
+    (out / "selection.json").write_text(json.dumps([c.to_dict() for c in chosen], indent=2),
+                                        encoding="utf-8")
+    print(f"{len(chosen)} of {len(frames)} frames selected -> {tasks}")
+    print(f"Label config: {out / 'label_config.xml'}. Import tasks.json into Label Studio.")
+    return 0
+
+
+def cmd_label_import(args) -> int:
+    from .learning.labelstudio import import_coco, split_by_day
+
+    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    coco = import_coco(json.loads(Path(args.export).read_text(encoding="utf-8")), classes)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "instances_all.json").write_text(json.dumps(coco), encoding="utf-8")
+    msg = f"{len(coco['images'])} labelled images, {len(coco['annotations'])} boxes"
+    if args.val_days:
+        train, val = split_by_day(coco, args.val_days)
+        (out / "instances_train.json").write_text(json.dumps(train), encoding="utf-8")
+        (out / "instances_val.json").write_text(json.dumps(val), encoding="utf-8")
+        msg += f"; split by day: {len(train['images'])} train / {len(val['images'])} val"
+    print(msg)
+    return 0
+
+
+def cmd_validate_model(args) -> int:
+    from .ai.validation import reports_dir
+    from .inference.engine import OnnxEngine
+    from .learning.validate import Criteria, predict_from_spool, run_validation, write_report
+
+    cfg = _load_config(args.config)
+    coco = json.loads(Path(args.coco).read_text(encoding="utf-8"))
+    classes = [c.strip() for c in args.classes.split(",") if c.strip()]
+    engine = OnnxEngine(Path(args.model), input_size=tuple(cfg.inference.input_size),
+                        confidence_threshold=0.01, class_names=cfg.inference.class_names)
+    preds = predict_from_spool(engine, Path(cfg.spool.spool_dir), coco)
+    crit = Criteria(classes, min_images=args.min_images, op_threshold=args.threshold)
+    report = run_validation(Path(args.model), engine.metadata.name, engine.metadata.version, coco,
+                            preds, crit, args.reviewer, args.notes or "")
+    for c in report["checks"]:
+        print(f"  [{'ok' if c['passed'] else 'FAIL'}] {c['check']}: {c['detail']}")
+    path = write_report(report, reports_dir())
+    print(f"{'PASSED' if report['passed'] else 'NOT PASSED'} -> {path}")
+    return 0 if report["passed"] else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -333,6 +508,62 @@ def main(argv: list[str] | None = None) -> int:
     p_pre = sub.add_parser("preflight", help="Check the edge system before a flight.")
     p_pre.add_argument("--simulate", action="store_true", help="Skip the live telemetry check.")
     p_pre.set_defaults(func=cmd_preflight)
+
+    p_walk = sub.add_parser("walk", help="Capture training imagery on foot (pole + USB GNSS).")
+    p_walk.add_argument("--gps", required=True, help="serial port, e.g. /dev/ttyACM0")
+    p_walk.add_argument("--baud", type=int, default=9600)
+    p_walk.add_argument("--pole-height", type=float, default=2.0)
+    p_walk.add_argument("--duration", type=float)
+    p_walk.add_argument("--frames", type=int)
+    p_walk.set_defaults(func=cmd_walk)
+
+    p_le = sub.add_parser("label-export", help="Pick frames worth labelling; write Label Studio tasks.")
+    p_le.add_argument("--n", type=int, default=100)
+    p_le.add_argument("--out", default="labeling")
+    p_le.add_argument("--classes", required=True, help="comma-separated labels")
+    p_le.add_argument("--seed", type=int, default=0)
+    p_le.set_defaults(func=cmd_label_export)
+
+    p_li = sub.add_parser("label-import", help="Label Studio export -> COCO (split by capture day).")
+    p_li.add_argument("--export", required=True)
+    p_li.add_argument("--classes", required=True)
+    p_li.add_argument("--out", default="data/local/annotations")
+    p_li.add_argument("--val-days", type=int, default=1)
+    p_li.set_defaults(func=cmd_label_import)
+
+    p_vm = sub.add_parser("validate-model", help="Score a model on local labels; write a validation report.")
+    p_vm.add_argument("--model", required=True)
+    p_vm.add_argument("--coco", required=True, help="local labelled set (instances_val.json)")
+    p_vm.add_argument("--classes", required=True, help="classes that must meet the criteria")
+    p_vm.add_argument("--reviewer", required=True)
+    p_vm.add_argument("--notes")
+    p_vm.add_argument("--min-images", type=int, default=200)
+    p_vm.add_argument("--threshold", type=float, default=0.3)
+    p_vm.set_defaults(func=cmd_validate_model)
+
+    p_rx = sub.add_parser("prescription", help="Spot-spray map from the spool (ISOXML / shapefile).")
+    p_rx.add_argument("--field-id", required=True)
+    p_rx.add_argument("--boundary", required=True, help="treatment boundary GeoJSON Polygon")
+    p_rx.add_argument("--rate", type=float, required=True)
+    p_rx.add_argument("--unit", default="L/ha", choices=["L/ha", "kg/ha"])
+    p_rx.add_argument("--product", default="herbicide")
+    p_rx.add_argument("--cell-m", type=float, default=6.0, help="sprayer section width")
+    p_rx.add_argument("--buffer-m", type=float, default=10.0)
+    p_rx.add_argument("--format", default="isoxml", choices=["isoxml", "shapefile", "geojson"])
+    p_rx.add_argument("--out", help="zip file to write")
+    p_rx.add_argument("--approve-as", help="name of the person approving")
+    p_rx.add_argument("--wind-ms", type=float, help="measured wind speed now")
+    p_rx.set_defaults(func=cmd_prescription)
+
+    p_sat = sub.add_parser("satellite", help="Update a field's Sentinel-2 series; flag patches to scout.")
+    p_sat.add_argument("--field-id", required=True)
+    p_sat.add_argument("--boundary", required=True, help="GeoJSON Polygon / Feature of the field")
+    p_sat.add_argument("--db", default="data/satellite.sqlite")
+    p_sat.add_argument("--since", help="YYYY-MM-DD (default: 60 days before --until)")
+    p_sat.add_argument("--until", help="YYYY-MM-DD (default: today)")
+    p_sat.add_argument("--max-cloud", type=float, default=40.0)
+    p_sat.add_argument("--geojson", help="write flagged cells and scout patches here")
+    p_sat.set_defaults(func=cmd_satellite)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

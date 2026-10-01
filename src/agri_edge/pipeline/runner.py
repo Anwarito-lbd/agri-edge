@@ -32,6 +32,7 @@ class RunStats:
     skipped_no_telemetry: int = 0
     detections: int = 0
     spooled: int = 0
+    inference_errors: int = 0
     qa_failure_counts: dict[str, int] = field(default_factory=dict)
 
     def as_dict(self) -> dict:
@@ -42,6 +43,7 @@ class RunStats:
             "skipped_no_telemetry": self.skipped_no_telemetry,
             "detections": self.detections,
             "spooled": self.spooled,
+            "inference_errors": self.inference_errors,
             "qa_failure_counts": dict(self.qa_failure_counts),
         }
 
@@ -55,11 +57,20 @@ class Pipeline:
         spool: Spool,
         engine: InferenceEngine | None = None,
         environment=None,
+        publisher=None,
+        capture_mode: str = "flight",
     ):
         self.cfg = cfg
         self.camera = camera
         self.telemetry = telemetry
         self.spool = spool
+        # Optional live link to the ops station (iot/edge_publisher.py). Best
+        # effort: the spool above is the record; this is a courtesy.
+        self.publisher = publisher
+        # flight | walk | bench | sitl | simulated -- recorded in every sidecar so a
+        # pole-walk frame is never mistaken for an aerial one (different GSD,
+        # different view angle, different training distribution).
+        self.capture_mode = capture_mode
         self.engine = engine
         # Optional. Environmental data is valuable -- and required on spray
         # records -- but never flight-critical, so its absence must not stop a run.
@@ -72,8 +83,16 @@ class Pipeline:
         return self
 
     def __exit__(self, *exc) -> None:
-        self.camera.stop()
-        self.telemetry.stop()
+        try:
+            self.camera.stop()
+            self.telemetry.stop()
+        finally:
+            # Release the accelerator too. The Hailo VDevice is exclusive: a
+            # process that never releases it blocks the next run from opening it.
+            if self.engine is not None:
+                self.engine.close()
+            if self.publisher is not None:
+                self.publisher.close()
 
     # -- one frame -------------------------------------------------------------
 
@@ -87,10 +106,19 @@ class Pipeline:
         # Refuse to capture without fresh telemetry. An image with no trustworthy
         # position cannot support the temporal comparison that repeated monitoring
         # exists for, and an unlocatable frame costs storage for nothing.
+        #
+        # Position and attitude are checked separately: the georeference needs
+        # both, and one stream can stall while the other keeps arriving.
+        max_age = self.cfg.capture.max_telemetry_age_s
         age = telem.age_s()
-        if telem.timestamp == 0.0 or age > self.cfg.capture.max_telemetry_age_s:
+        if telem.timestamp == 0.0 or age > max_age:
             self.stats.skipped_no_telemetry += 1
-            log.warning("Skipping capture: telemetry stale (%.1f s old).", age)
+            log.warning("Skipping capture: position stale (%.1f s old).", age)
+            return None
+        att_age = telem.attitude_age_s()
+        if att_age is not None and att_age > max_age:
+            self.stats.skipped_no_telemetry += 1
+            log.warning("Skipping capture: attitude stale (%.1f s old).", att_age)
             return None
 
         frame = self.camera.capture(telem)
@@ -104,11 +132,24 @@ class Pipeline:
             for f in qa.failures:
                 self.stats.qa_failure_counts[f.name] = self.stats.qa_failure_counts.get(f.name, 0) + 1
 
-        detections = self._infer(frame, qa)
+        # The frame is spooled whatever the detector does. Inference used to run
+        # before spool.add with nothing around it, so one exception from the
+        # engine -- a driver hiccup, a bad tensor shape -- lost the imagery too,
+        # and imagery is the one thing that can be re-processed later.
+        inference_error = None
+        try:
+            detections = self._infer(frame, qa)
+        except Exception as exc:  # noqa: BLE001 - recorded, and the frame is kept
+            self.stats.inference_errors += 1
+            inference_error = f"{type(exc).__name__}: {exc}"
+            log.exception("Inference failed on frame %s; spooling it without detections.",
+                          frame.sequence)
+            detections = []
         indices = self._index_summaries(frame)
         priority = self._priority(qa, detections)
 
         metadata = self._metadata(frame, qa, detections, indices, priority)
+        metadata["inference_error"] = inference_error
         self.spool.add(
             image=frame.image,
             metadata=metadata,
@@ -118,6 +159,11 @@ class Pipeline:
             sequence=frame.sequence,
         )
         self.stats.spooled += 1
+        if self.publisher is not None:
+            self.publisher.publish_frame(metadata)
+            every = max(1, int(self.cfg.publish.health_every_frames))
+            if self.stats.captured % every == 0:
+                self.publisher.publish_health(self.stats.as_dict(), telem, self.spool.stats())
         return metadata
 
     def _infer(self, frame: Frame, qa: QAReport) -> list:
@@ -174,15 +220,18 @@ class Pipeline:
         fence = self._treatment_fence()
         if fence is None:
             return
-        poly, origin = fence
+        poly, holes, origin = fence
         from ..geo.geofence import TreatmentGeofence, project_to_local
 
-        gf = TreatmentGeofence(poly, self.cfg.treatment_zone.buffer_m)
+        gf = TreatmentGeofence(poly, self.cfg.treatment_zone.buffer_m, holes_m=holes)
         for d in detections:
             if not d.has_position:
                 continue
             east, north = project_to_local([d.lat], [d.lon], origin)[0]
-            d.in_treatment_zone = gf.may_treat((east, north))
+            # The georeference's own uncertainty comes out of the buffer.
+            d.in_treatment_zone = gf.may_treat(
+                (east, north), position_error_m=float(d.position_error_m or 0.0)
+            )
 
     def _treatment_fence(self):
         """Load the boundary once and cache it. None when none is configured.
@@ -197,10 +246,10 @@ class Pipeline:
         self._fence_cache = None
         path = self.cfg.treatment_zone.boundary_geojson
         if path is not None:
-            from ..geo.geofence import load_boundary_geojson
+            from ..geo.geofence import load_treatment_boundary
 
             try:
-                self._fence_cache = load_boundary_geojson(path)
+                self._fence_cache = load_treatment_boundary(path)
             except Exception as exc:
                 log.error(
                     "Treatment boundary %s could not be loaded (%s). No detection "
@@ -261,6 +310,7 @@ class Pipeline:
         t = frame.telemetry
         return {
             "schema": "agri-edge/frame/1",
+            "capture_mode": self.capture_mode,
             "site": self.cfg.site,
             "field_id": self.cfg.field_id,
             "sequence": frame.sequence,

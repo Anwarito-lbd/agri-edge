@@ -259,3 +259,76 @@ class TestGeoJSONLoading:
         assert at(self.LAT - self.D + 5 / 111320, self.LON) == (True, False)   # 5 m in
         assert at(self.LAT - self.D + 50 / 111320, self.LON) == (True, True)   # 50 m in
         assert at(self.LAT - self.D - 20 / 111320, self.LON) == (False, False)  # outside
+
+
+class TestHolesAndPositionError:
+    """Audit 24 Sept, F14: holes in a treatment boundary were ignored, so
+    treatment was permitted inside a slough or yard site cut out of the field,
+    and a detection's own position error never reduced the buffer."""
+
+    HOLE = np.array([[80.0, 30.0], [120.0, 30.0], [120.0, 70.0], [80.0, 70.0]])
+
+    def _fence(self, buffer=10.0):
+        from agri_edge.geo.geofence import TreatmentGeofence
+        return TreatmentGeofence(FIELD, treatment_buffer_m=buffer, holes_m=[self.HOLE])
+
+    def test_no_treatment_inside_a_hole(self):
+        assert not self._fence().may_treat((100.0, 50.0))
+
+    def test_no_treatment_within_the_buffer_of_a_hole(self):
+        assert not self._fence().may_treat((125.0, 50.0))     # 5 m outside the hole
+
+    def test_treatment_clear_of_the_hole_is_allowed(self):
+        assert self._fence().may_treat((40.0, 50.0))
+
+    def test_flight_over_a_hole_is_fine(self):
+        assert self._fence().may_fly((100.0, 50.0))
+
+    def test_position_error_comes_out_of_the_buffer(self):
+        fence = self._fence()
+        point = (40.0, 14.0)                                  # 14 m from the edge, buffer 10
+        assert fence.may_treat(point, position_error_m=3.0)
+        assert not fence.may_treat(point, position_error_m=5.0)
+
+    def test_loader_keeps_holes(self, tmp_path):
+        import json
+
+        from agri_edge.geo.geofence import load_treatment_boundary
+
+        la, lo, d = 49.9, -97.1, 200.0 / 111320.0
+        outer = [[lo - d, la - d], [lo + d, la - d], [lo + d, la + d], [lo - d, la + d], [lo - d, la - d]]
+        h = d / 4
+        hole = [[lo - h, la - h], [lo + h, la - h], [lo + h, la + h], [lo - h, la + h], [lo - h, la - h]]
+        p = tmp_path / "f.geojson"
+        p.write_text(json.dumps({"type": "Polygon", "coordinates": [outer, hole]}), encoding="utf-8")
+        ring, holes, _ = load_treatment_boundary(p)
+        assert len(ring) == 4 and len(holes) == 1 and len(holes[0]) == 4
+
+
+def test_pipeline_refuses_treatment_inside_a_boundary_hole(tmp_path):
+    """End to end through the runner's fence loading."""
+    import json
+
+    from agri_edge.config import Config
+    from agri_edge.inference.engine import Detection
+    from agri_edge.pipeline.runner import Pipeline
+
+    la, lo, d = 50.0, -104.0, 300.0 / 111320.0
+    outer = [[lo - 2 * d, la - d], [lo + 2 * d, la - d], [lo + 2 * d, la + d],
+             [lo - 2 * d, la + d], [lo - 2 * d, la - d]]
+    h = d / 3
+    hole = [[lo - h, la - h], [lo + h, la - h], [lo + h, la + h], [lo - h, la + h], [lo - h, la - h]]
+    p = tmp_path / "zone.geojson"
+    p.write_text(json.dumps({"type": "Polygon", "coordinates": [outer, hole]}), encoding="utf-8")
+
+    cfg = Config()
+    cfg.treatment_zone.boundary_geojson = p
+    pipe = Pipeline.__new__(Pipeline)
+    pipe.cfg = cfg
+    in_hole = Detection("weed", 0.9, (0, 0, 1, 1), validated_locally=True)
+    in_hole.lat, in_hole.lon, in_hole.position_error_m = la, lo, 1.0
+    clear = Detection("weed", 0.9, (0, 0, 1, 1), validated_locally=True)
+    clear.lat, clear.lon, clear.position_error_m = la, lo + 1.5 * d, 1.0
+    pipe._check_treatment_zone([in_hole, clear])
+    assert in_hole.in_treatment_zone is False
+    assert clear.in_treatment_zone is True
