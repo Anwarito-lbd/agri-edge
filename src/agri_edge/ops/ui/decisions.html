@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>Decisions — Agri-Edge Ops</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;background:#0f1a0f;color:#e8f0e8;}
+main{padding:16px;max-width:1100px;margin:0 auto;}
+.card{background:#182818;border:1px solid #2d4a2d;border-radius:8px;padding:14px;margin:10px 0;}
+pre{background:#0a120a;padding:10px;overflow:auto;border-radius:6px;font-size:12px;}
+h1{font-size:1.4rem;} .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+.k{font-size:1.8rem;font-weight:700;} .lbl{font-size:12px;color:#9fbf9f;} td,th{border:1px solid #2d4a2d;padding:5px;font-size:13px;text-align:left;}
+.ok{color:#7be07b;} .bad{color:#ff8a65;}
+</style></head><body>
+<div id="sim-banner" style="background:#c45c00;color:#fff;padding:10px 16px;font-weight:700;letter-spacing:1px;text-align:center;">
+SIMULATION — synthetic demo data (synthetic=true). Not live farm telemetry.
+</div><nav style="display:flex;gap:12px;padding:12px;background:#1a2e1a;flex-wrap:wrap;">
+<a style="color:#b6f5b6" href="/ops/">Overview</a>
+<a style="color:#b6f5b6" href="/ops/map.html">Map</a>
+<a style="color:#b6f5b6" href="/ops/live.html">Live</a>
+<a style="color:#b6f5b6" href="/ops/weather.html">Weather</a>
+<a style="color:#b6f5b6" href="/ops/sensors.html">Sensors</a>
+<a style="color:#b6f5b6" href="/ops/alerts.html">Alerts</a>
+<a style="color:#b6f5b6" href="/ops/irrigation.html">Irrigation</a>
+<a style="color:#b6f5b6" href="/ops/decisions.html">Decisions</a>
+<a style="color:#b6f5b6" href="/ops/recommendations.html">Recommendations</a>
+<a style="color:#b6f5b6" href="/ops/map3d.html">3D</a>
+</nav>
+<main>
+<h1>Treatment decisions</h1>
+<div class="card" style="border-color:#c45c00;"><b>READ-ONLY.</b> This page only displays the decision engine's event log. It cannot arm, command or actuate anything; there is no control on it and no write route behind it. The actuator is a <b>simulated</b> recorder (SIMULATED, not VALIDATED).</div>
+<div id="content" class="card">Loading…</div>
+</main>
+<script>
+fetch('/api/ops/overview').then(r=>r.json()).then(o=>{if(!o.simulation){const b=document.getElementById('sim-banner');if(b)b.style.display='none';}}).catch(()=>{});
+async function get(path){ const r=await fetch(path); if(r.status===401){location.href='/ops/login.html';throw new Error('login required');} return r.json(); }
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function yn(v){return v?'<span class="ok">yes</span>':'<span class="bad">NO</span>';}
+
+(async()=>{
+  const d=await get('/api/ops/decisions?limit=50');
+  const c=d.counts||{};
+  const s=d.state||{};
+  const g=s.geofence||{};
+  const a=s.actuator||{};
+  const kpis=[['Treated (simulated)',c.treated],['Skipped / refused',c.skipped],['of which outside geofence',c.outside_geofence],['refused by another gate',c.refused_other_gate],['Detections evaluated',c.detected]];
+  const items=kpis.map(k=>`<div class="card"><div class="k">${esc(k[1]??0)}</div><div class="lbl">${esc(k[0])}</div></div>`).join('');
+  const gateRows=Object.entries((d.refusals_by_gate||{}).reasons||{}).map(([gate,rs])=>
+    Object.entries(rs).map(([reason,n])=>`<tr><td>${esc(gate)}</td><td>${esc(reason)}</td><td>${esc(n)}</td></tr>`).join('')).join('');
+  const rows=(d.recent||[]).map(e=>`<tr><td>${esc(e.ts?new Date(e.ts*1000).toISOString():'')}</td><td>${esc(e.outcome)}</td><td>${esc(e.detection_id)}</td><td>${esc(e.label)}</td><td>${esc(e.confidence)}</td><td>${esc(e.lat==null?'':Number(e.lat).toFixed(5)+', '+Number(e.lon).toFixed(5))}</td><td>${esc((e.reasons||[]).join(', '))}</td></tr>`).join('');
+  const stateRows=[
+    ['Operator armed',yn(s.operator_armed)],['Payload armed',yn(s.payload_armed)],
+    ['Armed by',esc(s.armed_by||'—')],['Arm live (unexpired)',yn(s.arm_live)+' · '+esc(s.arm_seconds_remaining==null?'':s.arm_seconds_remaining+' s left')],
+    ['Geofence configured',yn(g.configured)+' · '+esc(g.configured?(g.vertices+' vertices, buffer '+g.treatment_buffer_m+' m, '+g.area_ha+' ha'):g.note)],
+    ['Mission state',esc(s.mission_state)+' · '+(s.mission_permits_treatment?'permits treatment':'does not permit treatment')],
+    ['Actuator',esc(a.simulated?'SIMULATED':'REAL (unexpected)')+' · healthy '+esc(a.healthy)+' · fault '+esc(a.fault_code||'none')]
+  ].map(r=>'<tr><th>'+esc(r[0])+'</th><td>'+r[1]+'</td></tr>').join('');
+  const tbl=(head,body,n)=>'<table style="border-collapse:collapse;width:100%;background:#0a120a"><tr>'+head+'</tr>'+(body||('<tr><td colspan='+n+'>none</td></tr>'))+'</table>';
+  document.getElementById('content').innerHTML=
+    '<div class="grid">'+items+'</div>'+
+    '<h3>Safety state (read-only readout)</h3>'+
+    '<table style="border-collapse:collapse;width:100%;background:#0a120a">'+stateRows+'</table>'+
+    '<p class="lbl">'+esc(s.arm_note)+' · source: '+esc(d.source)+' · '+esc(d.status)+'</p>'+
+    '<h3>Refusals per gate</h3>'+tbl('<th>Gate</th><th>Reason</th><th>Count</th>',gateRows,3)+
+    '<h3>Recent decisions</h3>'+tbl('<th>Time (UTC)</th><th>Outcome</th><th>Detection</th><th>Label</th><th>Conf.</th><th>Position</th><th>Reasons</th>',rows,7)+
+    '<p class="lbl">'+esc(d.safety_note)+'</p>';
+})();
+</script>
+</body></html>

@@ -1,6 +1,6 @@
 # Ops Station — optional PostGIS backend
 
-**Status: SIMULATED.** SQLite stays the default. The PostGIS code (`src/agri_edge/ops/postgis.py`) is exercised only against a throwaway local PostGIS in `tests/test_ops_postgis.py`, which is **skipped** when none is reachable. **The compose file `ground_iot/docker-compose.postgis.yml` has never been run.** **Nothing has been run against a production PostGIS.** Not validated against any real hardware or farm.
+**Status: BENCH** (real PostgreSQL 17 + PostGIS 3.5 on the build box, 2026-10-02; see "Live-service run" below). SQLite stays the default. The PostGIS code (`src/agri_edge/ops/postgis.py`) is exercised against a throwaway local PostGIS in `tests/test_ops_postgis.py`, which is **skipped** when none is reachable. **The compose file `ground_iot/docker-compose.postgis.yml` has never been run** (no Docker on the build box; only its init SQL was applied with `psql`). **Nothing has been run against a production PostGIS.** Not validated against any real hardware or farm.
 
 ## Selecting a backend (`DATABASE_URL`)
 
@@ -41,3 +41,26 @@ AGRIEDGE_TEST_PG_URL=postgresql://user:pw@127.0.0.1:5432/scratch python -m pytes
 Without `AGRIEDGE_TEST_PG_URL` (or if the server/PostGIS extension is unreachable) the live tests skip; selection, URL parsing and SQLite-default tests still run. Use a scratch database, never production.
 
 Related: `MQTT_INGEST.md`, `OPERATIONS_STATION.md`.
+
+## Live-service run (BENCH, 2026-10-02)
+
+The live tests were run on the build box against **real, throwaway** services — not Docker, not
+production, synthetic data only:
+
+```bash
+sudo apt-get install -y postgresql postgis mosquitto
+sudo pg_ctlcluster 17 main start            # PostgreSQL 17 + PostGIS 3.5
+sudo -u postgres psql -c "CREATE DATABASE agriedge_test"
+sudo -u postgres psql -d agriedge_test -c "CREATE EXTENSION postgis"
+printf 'listener 18830 127.0.0.1\nallow_anonymous true\n' > /tmp/mosq.conf && /usr/sbin/mosquitto -c /tmp/mosq.conf -d
+export AGRIEDGE_TEST_PG_URL=postgresql://postgres:<throwaway-password>@127.0.0.1:5432/agriedge_test
+export AGRIEDGE_TEST_MQTT=127.0.0.1:18830
+pytest tests/test_ops_postgis.py tests/test_ops_ingest_broker.py tests/test_live_services_e2e.py -rs
+```
+
+Result: all passed, none skipped; **no bug was found** in the PostGIS store or the live ingest.
+`tests/test_live_services_e2e.py` adds the two cases the others did not cover: MQTT publish →
+`OpsIngestor` → rows in real PostGIS (replay deduplicated), and an `ST_DWithin` spatial query over
+ingested detection geometry. CI job: `docs/ci/live-services.yml` — **not active**; the push token lacked the `workflow`
+scope, so it is kept there with activation steps in `docs/ci/README.md`, and has never run on GitHub. What this does **not** show: the `postgis/postgis:16-3.4` image, the repo's
+ACL'd Mosquitto config, TLS, load, or any production database.

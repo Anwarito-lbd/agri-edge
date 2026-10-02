@@ -257,6 +257,9 @@ def seed_demo(store: OpsStore, *, seed: int = 42) -> dict[str, Any]:
         MobileNote(note_id=new_id("mn_"), ts=utcnow().isoformat(), author="operator", text="Check valve v1 tomorrow", lat=45.401, lon=-75.698, synthetic=True)
     )
 
+    from .decisions import seed_demo_decisions
+    seed_demo_decisions(store)     # SYNTHETIC run through the simulated-only engine
+
     return {
         "simulation": True,
         "synthetic": True,
