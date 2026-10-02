@@ -63,6 +63,25 @@ class Detection:
     # geo/geofence.py). None means the question was never asked.
     in_treatment_zone: bool | None = None
 
+    # World position from `geo.georef.georeference_detection` (pixel bbox centre +
+    # intrinsics + vehicle pose, flat-ground assumption). All None means NOT
+    # georeferenced -- never a default. `lat`/`lon`/`position_error_m` above are
+    # kept in step with `world_lat`/`world_lon`/`position_uncertainty_m` so
+    # existing consumers (farmOS, the geofence check) keep working unchanged.
+    #
+    #   local_x / local_y        metres EAST / NORTH of the local-frame origin the
+    #                            caller supplied (see georef.py; defaults to the
+    #                            vehicle's own position when no origin is given)
+    #   position_uncertainty_m   1-sigma-style horizontal budget from the
+    #                            documented error model -- a model, not a measurement
+    #   georef_status            "OK" or a REJECTED_* / FLAGGED_* code; None = never run
+    world_lat: float | None = None
+    world_lon: float | None = None
+    local_x: float | None = None
+    local_y: float | None = None
+    position_uncertainty_m: float | None = None
+    georef_status: str | None = None
+
     @property
     def has_position(self) -> bool:
         return self.lat is not None and self.lon is not None
@@ -105,6 +124,16 @@ class Detection:
                 out["position_error_m"] = self.position_error_m
         elif self.geo_error is not None:
             out["geo_error"] = self.geo_error
+        if self.world_lat is not None and self.world_lon is not None:
+            out["world_lat"] = round(float(self.world_lat), 7)
+            out["world_lon"] = round(float(self.world_lon), 7)
+            if self.local_x is not None and self.local_y is not None:
+                out["local_x"] = round(float(self.local_x), 3)
+                out["local_y"] = round(float(self.local_y), 3)
+            if self.position_uncertainty_m is not None:
+                out["position_uncertainty_m"] = round(float(self.position_uncertainty_m), 2)
+        if self.georef_status is not None:
+            out["georef_status"] = self.georef_status
         if self.in_treatment_zone is not None:
             out["in_treatment_zone"] = self.in_treatment_zone
         return out

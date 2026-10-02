@@ -1,6 +1,6 @@
 # Capability status
 
-**Updated:** 2026-09-24 (later) — roadmap items 1–7 built in software: edge → station ingest, Sentinel-2 change detection, agronomy (ET0 water balance, growth stage, disease and frost risk), ISOXML/shapefile prescriptions, ESP32/LoRaWAN sensors with per-device credentials, the field-training loop, and users/roles plus the farmer web app (agri-edge-web#3). None of it has run on hardware or against live services yet; see the rows below. Earlier the same day: second verification audit (docs/audit-2026-09-24.md): 15 defects fixed with tests (safety gates, ops API write surface, MQTT broker, telemetry freshness, spool, Hailo decode, Camera Module 3 geometry); ops checklist re-graded 80 DONE / 8 PARTIAL. Previous: 2026-09-20 (America/Toronto) — WSL2 installed; ArduCopter SITL built and the pipeline verified against it (14/14, 10 frames spooled with real EKF telemetry). Verification audit in docs/audit-2026-09-19.md. CI green on both repos.
+**Updated:** 2026-10-01 (America/Toronto) — broker-path MQTT ingest (`ops/live_ingest.py`, subscribe-only), optional PostGIS backend, georeferencing, decision engine and farmOS/AgOpenGPS adapter stubs added, all SIMULATED (in-memory broker / throwaway PostGIS only; nothing VALIDATED). Previously (2026-09-24, later): roadmap items 1–7 built in software: edge → station ingest, Sentinel-2 change detection, agronomy (ET0 water balance, growth stage, disease and frost risk), ISOXML/shapefile prescriptions, ESP32/LoRaWAN sensors with per-device credentials, the field-training loop, and users/roles plus the farmer web app (agri-edge-web#3). None of it has run on hardware or against live services yet; see the rows below. Earlier the same day: second verification audit (docs/audit-2026-09-24.md): 15 defects fixed with tests (safety gates, ops API write surface, MQTT broker, telemetry freshness, spool, Hailo decode, Camera Module 3 geometry); ops checklist re-graded 80 DONE / 8 PARTIAL. Previous: 2026-09-20 (America/Toronto) — WSL2 installed; ArduCopter SITL built and the pipeline verified against it (14/14, 10 frames spooled with real EKF telemetry). Verification audit in docs/audit-2026-09-19.md. CI green on both repos.
 
 **Legend:** Code = implemented in repo · Sim = works in sim/tests · Hardware = run on real device · Field = farm-validated  
 Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
@@ -59,6 +59,24 @@ Statuses: ✅ done · ⏳ partial/unproven · ❌ absent · N/A
 | Hailo compile `--dry-run` | ✅ | ✅ | ❌ BLOCKED no WSL2 | ❌ |
 
 Do not mark Hardware/Field green without evidence.
+
+## Phase status (DONE / SIMULATED / BENCH / BLOCKED-HARDWARE)
+
+| Phase | Status | Evidence / note |
+|-------|--------|-----------------|
+| Ops Station §79–166 | **DONE** 88/88 sim-complete | `docs/operations/PHASE_CHECKLIST_79_166.md`; simulation only, not field-validated |
+| MQTT ingest (subscribe-only) | **SIMULATED** | `src/agri_edge/ops/live_ingest.py`, `scripts/ops_mqtt_ingest.py`, [`docs/operations/MQTT_INGEST.md`](operations/MQTT_INGEST.md); in-memory broker; real-broker test skipped without a broker |
+| PostGIS backend option | **SIMULATED** | `src/agri_edge/ops/postgis.py`, [`docs/operations/POSTGIS_BACKEND.md`](operations/POSTGIS_BACKEND.md); SQLite remains the default; live tests skipped without a PostGIS |
+| PostGIS compose file never run | **SIMULATED** (never run) | `ground_iot/docker-compose.postgis.yml` has never been started; nothing run against production PostGIS |
+| Georeferencing (pose-validated) | **SIMULATED** | `src/agri_edge/geo/georef.py`; unit-tested maths, no real camera/GNSS |
+| Treatment decision engine + simulated actuator | **SIMULATED** | `src/agri_edge/decision/engine.py`; fail-closed gates, simulated actuator only |
+| farmOS and AgOpenGPS adapter stubs | **SIMULATED** | `src/agri_edge/adapters/`; stubs, no network / no I/O |
+| Live Pi camera | **BLOCKED-HARDWARE** | no Pi camera on hand |
+| Real HEF + HailoRT on the AI HAT | **BLOCKED-HARDWARE** | needs Pi + AI HAT + HailoRT + a compiled `.hef` |
+| Actuators and pumps | **BLOCKED-HARDWARE** | no physical treatment hardware |
+| Field radios | **BLOCKED-HARDWARE** | no radios / gateways deployed |
+
+No row in this table has hardware or field evidence; none is claimed as validated.
 
 ## YOLOX / Detection interface (priority 3 + 6)
 

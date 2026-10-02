@@ -119,3 +119,105 @@ def parse_topic(topic: str) -> ParsedTopic:
 def assert_not_flight_command(topic: str) -> None:
     """Explicit guard for bridges — irrigation/set is OK; arm/mode is not."""
     parse_topic(topic)
+
+
+# ---------------------------------------------------------------------------
+# Operations Station topics (docs/MQTT_CONTRACT.md, section "Operations Station")
+#
+#   agriedge/{farm}/weather/{station}/observations
+#   agriedge/{farm}/soil/{station}/observations
+#   agriedge/{farm}/water/{station}/observations
+#   agriedge/{farm}/irrigation/{controller}/state      (STATE only -- never a command)
+#   agriedge/{farm}/rtk/{station}/state
+#   agriedge/{farm}/gateway/{gateway}/health
+#   agriedge/{farm}/{vehicle}/detections               (vehicle -> ops, read path)
+#
+# This parser is for the INGEST (subscribe) side. It accepts only leaves that
+# carry data toward the Ops Station, so `irrigation/{c}/set`, `.../arm`,
+# `.../mission` and friends all fail to parse. Commands are not ingestible.
+# ---------------------------------------------------------------------------
+
+_OPS_ID_RE = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
+
+OPS_CATEGORY_LEAVES: dict[str, frozenset[str]] = {
+    "weather": frozenset({"observations"}),
+    "soil": frozenset({"observations"}),
+    "water": frozenset({"observations"}),
+    "irrigation": frozenset({"state", "events"}),
+    "rtk": frozenset({"state"}),
+    "gateway": frozenset({"health"}),
+}
+VEHICLE_LEAVES = frozenset({"detections", "telemetry"})
+
+# Subscription filters the live ingest uses (MQTT wildcards; `+` = one level).
+OPS_INGEST_SUBSCRIPTIONS: tuple[str, ...] = (
+    "agriedge/+/weather/+/observations",
+    "agriedge/+/soil/+/observations",
+    "agriedge/+/water/+/observations",
+    "agriedge/+/irrigation/+/state",
+    "agriedge/+/rtk/+/state",
+    "agriedge/+/gateway/+/health",
+    "agriedge/+/+/detections",
+)
+
+
+@dataclass(frozen=True)
+class OpsTopic:
+    farm_id: str
+    category: str  # weather|soil|water|irrigation|rtk|gateway|vehicle
+    device_id: str
+    leaf: str
+
+
+def ops_topic(farm_id: str, category: str, device_id: str, leaf: str) -> str:
+    """Build a canonical Ops topic (publisher side). Raises on anything that is not data."""
+    if category == "vehicle":
+        if leaf not in VEHICLE_LEAVES:
+            raise ValueError(f"unsupported vehicle leaf {leaf!r}")
+        topic = f"{TOPIC_PREFIX}/{farm_id}/{device_id}/{leaf}"
+    else:
+        if leaf not in OPS_CATEGORY_LEAVES.get(category, frozenset()):
+            raise ValueError(f"unsupported leaf {leaf!r} for category {category!r}")
+        topic = f"{TOPIC_PREFIX}/{farm_id}/{category}/{device_id}/{leaf}"
+    parse_ops_topic(topic)  # validates ids + forbidden segments
+    return topic
+
+
+def parse_ops_topic(topic: str) -> OpsTopic:
+    """Parse an Ops ingest topic or raise ValueError."""
+    t = topic.strip().strip("/")
+    _reject_forbidden_segments(t)
+    parts = t.split("/")
+    if len(parts) < 4 or parts[0] != TOPIC_PREFIX:
+        raise ValueError(f"unrecognized ops topic: {topic}")
+    for seg in parts[1:]:
+        if seg in ("+", "#") or not seg:
+            raise ValueError(f"wildcard or empty segment in concrete topic: {topic}")
+    if len(parts) == 4:
+        _, farm, vehicle, leaf = parts
+        if leaf not in VEHICLE_LEAVES:
+            raise ValueError(f"unsupported vehicle leaf in topic: {topic}")
+        category, device = "vehicle", vehicle
+    elif len(parts) == 5:
+        _, farm, category, device, leaf = parts
+        if leaf not in OPS_CATEGORY_LEAVES.get(category, frozenset()):
+            raise ValueError(f"unsupported ops category/leaf in topic: {topic}")
+    else:
+        raise ValueError(f"unrecognized ops topic: {topic}")
+    for ident in (farm, device):
+        if not _OPS_ID_RE.match(ident):
+            raise ValueError(f"invalid identifier {ident!r} in topic: {topic}")
+    return OpsTopic(farm_id=farm, category=category, device_id=device, leaf=leaf)
+
+
+def topic_matches(pattern: str, topic: str) -> bool:
+    """MQTT wildcard match: `+` one level, `#` the rest (must be last)."""
+    pp, tp = pattern.split("/"), topic.split("/")
+    for i, seg in enumerate(pp):
+        if seg == "#":
+            return i == len(pp) - 1
+        if i >= len(tp):
+            return False
+        if seg != "+" and seg != tp[i]:
+            return False
+    return len(pp) == len(tp)

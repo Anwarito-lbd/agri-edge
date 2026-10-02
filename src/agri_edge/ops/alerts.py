@@ -199,6 +199,14 @@ class AlertEngine:
         a.severity = order[min(idx + 1, len(order) - 1)]
         return a
 
+    def resolve_by_source(self, source_key: str, by: str) -> Optional[Alert]:
+        """Resolve the live alert for `source_key`, if any (a condition that cleared)."""
+        aid = self._by_source.get(source_key)
+        a = self._alerts.get(aid) if aid else None
+        if a is None or a.state == AlertState.RESOLVED:
+            return None
+        return self.resolve(a.alert_id, by)
+
     def list_alerts(self, state: Optional[AlertState] = None) -> list[Alert]:
         items = list(self._alerts.values())
         if state:

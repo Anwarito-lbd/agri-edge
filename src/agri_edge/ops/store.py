@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any, Optional
 
@@ -83,6 +84,14 @@ class OpsStore:
         # True while ops/ingest.replay_ingest_log rebuilds state: the log is the
         # durable record, so replayed readings must not be written again.
         self.replaying = False
+        # Latest STATE reported by each irrigation controller over ground MQTT
+        # (read-only mirror; the Ops Station never commands through this).
+        self.irrigation_state: dict[str, dict] = {}
+        # Held by the MQTT ingest thread while it mutates, and by the HTTP handler
+        # while it reads, so a GET never iterates a dict mid-insert.
+        self.lock = threading.RLock()
+        # Filled in by ops.live_ingest.OpsIngestor when one is attached.
+        self.ingest_stats: dict = {}
         self.sqlite_path = sqlite_path
         if sqlite_path:
             self._init_sqlite(sqlite_path)
@@ -122,23 +131,34 @@ class OpsStore:
         con.close()
 
     def persist_sensor(self, reading: SensorReading) -> None:
+        """Append in memory; mirror to SQLite (legacy path) and to DATABASE_URL.
+
+        `DATABASE_URL` selects the backend: sqlite:/// -> SQLite, postgresql:// ->
+        PostGIS (see ops/db.py `get_sensor_db`). Unset -> memory only (default).
+        Writes are idempotent on `reading_id`, so a replayed/buffered message
+        does not duplicate a row. While `replaying` (ingest-log rebuild) nothing
+        is written: the log is the durable record.
+        """
         self.sensor_readings.append(reading)
-        if not self.sqlite_path or self.replaying:
+        if self.replaying:
             return
-        con = sqlite3.connect(self.sqlite_path)
-        con.execute(
-            "INSERT OR REPLACE INTO sensor_readings(reading_id, payload) VALUES (?, ?)",
-            (reading.reading_id, json.dumps(reading.to_dict())),
-        )
+        if self.sqlite_path:
+            con = sqlite3.connect(self.sqlite_path)
+            con.execute(
+                "INSERT OR REPLACE INTO sensor_readings(reading_id, payload) VALUES (?, ?)",
+                (reading.reading_id, json.dumps(reading.to_dict())),
+            )
+            con.commit()
+            con.close()
         db = get_sensor_db()
         if db is not None:
             db.upsert(reading)
-        con.commit()
-        con.close()
-
 
     def persist_detection(self, row: dict) -> None:
         """Persist a normalized detection dict (SIMULATED / SQLite when DATABASE_URL set)."""
+        did = row.get("detection_id")
+        if did is not None:   # idempotent on id: a replay replaces, never duplicates
+            self.detections[:] = [d for d in self.detections if d.get("detection_id") != did]
         self.detections.append(row)
         if self.replaying:
             return

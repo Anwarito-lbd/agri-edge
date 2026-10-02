@@ -180,6 +180,10 @@ class OpsHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
+        with get_store().lock:
+            return self._do_get()
+
+    def _do_get(self) -> None:
         store = get_store()
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
@@ -234,6 +238,14 @@ class OpsHandler(BaseHTTPRequestHandler):
                 db = get_detection_db()
                 rows = db.list(limit=200) if db is not None else list(getattr(store, "detections", []))
                 return _json(self, 200, {**_banner(store), "detections": rows, "count": len(rows), "status": "IMPLEMENTED"})
+            if path == "/api/ops/ingest":
+                return _json(self, 200, {
+                    **_banner(store),
+                    "stats": dict(getattr(store, "ingest_stats", {}) or {}),
+                    "recent_rejects": list(getattr(store, "ingest_rejects", []) or []),
+                    "channel": "mqtt_subscribe_only",
+                    "status": "SIMULATED",
+                })
             if path == "/api/ops/sensors":
                 return _json(self, 200, {
                     **_banner(store),

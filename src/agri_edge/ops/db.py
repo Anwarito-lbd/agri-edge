@@ -1,7 +1,14 @@
-"""Optional SQLite SensorReading + Detection store (DATABASE_URL=sqlite:///...).
+"""Optional SensorReading + Detection stores, selected by DATABASE_URL.
 
-In-memory OpsStore remains the default for tests.
-Status: IMPLEMENTED (SQLite). PostGIS path documented in schema_postgis.sql (SIMULATED until Postgres).
+    unset / empty            -> no DB; in-memory OpsStore only (the default, and what tests use)
+    sqlite:///path/to.db     -> SQLite (IMPLEMENTED, bundled with Python)
+    postgresql://...         -> PostGIS via ops/postgis.py (SIMULATED: exercised only against a
+                                local throwaway PostGIS in tests; never against production)
+
+`AGRIEDGE_DB_URL` (documented in .env.example) is honoured when DATABASE_URL is unset.
+Both backends implement the same interface (`SensorStoreProtocol` /
+`DetectionStoreProtocol` below), so callers never branch on the backend.
+psycopg is imported lazily, inside ops/postgis.py, only when a postgresql:// URL is used.
 """
 from __future__ import annotations
 
@@ -9,7 +16,7 @@ import json
 import os
 import sqlite3
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Protocol, runtime_checkable
 from urllib.parse import urlparse
 
 from .schema import SensorReading
@@ -50,11 +57,66 @@ CREATE TABLE IF NOT EXISTS detections (
     mission_id TEXT,
     frame_id TEXT,
     payload_json TEXT,
-    synthetic INTEGER NOT NULL DEFAULT 0
+    synthetic INTEGER NOT NULL DEFAULT 0,
+    world_lat REAL,
+    world_lon REAL,
+    local_x REAL,
+    local_y REAL,
+    position_uncertainty_m REAL,
+    georef_status TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_detections_ts ON detections(ts);
 CREATE INDEX IF NOT EXISTS idx_detections_label ON detections(label);
 """
+
+
+# Columns added after the first release of the detections table. Applied to an
+# existing database file by `_migrate_detections` so older .db files keep working.
+_DETECTION_GEOREF_COLUMNS = (
+    ("world_lat", "REAL"),
+    ("world_lon", "REAL"),
+    ("local_x", "REAL"),
+    ("local_y", "REAL"),
+    ("position_uncertainty_m", "REAL"),
+    ("georef_status", "TEXT"),
+)
+
+
+def _migrate_detections(con: sqlite3.Connection) -> None:
+    have = {r[1] for r in con.execute("PRAGMA table_info(detections)").fetchall()}
+    for name, typ in _DETECTION_GEOREF_COLUMNS:
+        if name not in have:
+            con.execute(f"ALTER TABLE detections ADD COLUMN {name} {typ}")
+
+
+def _float_or_none(v: Any) -> Optional[float]:
+    return None if v is None else float(v)
+
+
+@runtime_checkable
+class SensorStoreProtocol(Protocol):
+    """What every sensor-reading backend (SQLite, PostGIS) provides."""
+
+    def upsert(self, reading: SensorReading) -> None: ...
+
+    def list(self, sensor_id: Optional[str] = None, limit: int = 100) -> list[dict[str, Any]]: ...
+
+
+@runtime_checkable
+class DetectionStoreProtocol(Protocol):
+    """What every detection backend (SQLite, PostGIS) provides."""
+
+    def upsert(self, row: dict[str, Any]) -> None: ...
+
+    def list(self, label: Optional[str] = None, limit: int = 100) -> list[dict[str, Any]]: ...
+
+
+def is_postgres_url(database_url: str) -> bool:
+    return (database_url or "").lower().startswith(("postgresql://", "postgres://"))
+
+
+def database_url_from_env() -> str:
+    return os.environ.get("DATABASE_URL") or os.environ.get("AGRIEDGE_DB_URL") or ""
 
 
 def parse_sqlite_path(database_url: str) -> Optional[str]:
@@ -76,6 +138,7 @@ class SensorReadingStore:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         con = sqlite3.connect(path)
         con.executescript(SCHEMA_SQLITE)
+        _migrate_detections(con)
         con.commit()
         con.close()
 
@@ -139,6 +202,7 @@ class DetectionStore:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         con = sqlite3.connect(path)
         con.executescript(SCHEMA_SQLITE)
+        _migrate_detections(con)
         con.commit()
         con.close()
 
@@ -154,8 +218,9 @@ class DetectionStore:
                 detection_id, ts, label, confidence, bbox_json, lat, lon,
                 model_name, model_version, backend, validated_locally,
                 may_drive_treatment, in_treatment_zone, farm_id, mission_id,
-                frame_id, payload_json, synthetic
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                frame_id, payload_json, synthetic,
+                world_lat, world_lon, local_x, local_y, position_uncertainty_m, georef_status
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 row.get("detection_id") or row.get("id"),
                 row.get("ts") or "",
@@ -175,6 +240,12 @@ class DetectionStore:
                 row.get("frame_id"),
                 json.dumps(row.get("payload") or {}),
                 1 if row.get("synthetic") else 0,
+                _float_or_none(row.get("world_lat")),
+                _float_or_none(row.get("world_lon")),
+                _float_or_none(row.get("local_x")),
+                _float_or_none(row.get("local_y")),
+                _float_or_none(row.get("position_uncertainty_m")),
+                row.get("georef_status"),
             ),
         )
         con.commit()
@@ -210,34 +281,56 @@ class DetectionStore:
         return out
 
 
-_SENSOR_DB: Optional[SensorReadingStore] = None
-_DET_DB: Optional[DetectionStore] = None
+_SENSOR_DB: Optional[SensorStoreProtocol] = None
+_DET_DB: Optional[DetectionStoreProtocol] = None
+_SENSOR_KEY: Optional[str] = None
+_DET_KEY: Optional[str] = None
 
 
-def get_sensor_db(database_url: Optional[str] = None) -> Optional[SensorReadingStore]:
-    """Return SQLite store when DATABASE_URL is sqlite:///; else None."""
-    global _SENSOR_DB
-    url = database_url if database_url is not None else os.environ.get("DATABASE_URL", "")
+def _postgres_stores(url: str):
+    from .postgis import PostgisStore  # lazy: psycopg only when a postgresql:// URL is used
+
+    return PostgisStore(url)
+
+
+def get_sensor_db(database_url: Optional[str] = None) -> Optional[SensorStoreProtocol]:
+    """Return the configured sensor store (SQLite or PostGIS), else None."""
+    global _SENSOR_DB, _SENSOR_KEY
+    url = database_url if database_url is not None else database_url_from_env()
+    if is_postgres_url(url):
+        if _SENSOR_DB is None or _SENSOR_KEY != url:
+            _SENSOR_DB = _postgres_stores(url).sensors
+            _SENSOR_KEY = url
+        return _SENSOR_DB
     path = parse_sqlite_path(url or "")
     if not path:
         return None
-    if _SENSOR_DB is None or _SENSOR_DB.path != path:
+    if _SENSOR_DB is None or _SENSOR_KEY != path:
         _SENSOR_DB = SensorReadingStore(path)
+        _SENSOR_KEY = path
     return _SENSOR_DB
 
 
-def get_detection_db(database_url: Optional[str] = None) -> Optional[DetectionStore]:
-    global _DET_DB
-    url = database_url if database_url is not None else os.environ.get("DATABASE_URL", "")
+def get_detection_db(database_url: Optional[str] = None) -> Optional[DetectionStoreProtocol]:
+    global _DET_DB, _DET_KEY
+    url = database_url if database_url is not None else database_url_from_env()
+    if is_postgres_url(url):
+        if _DET_DB is None or _DET_KEY != url:
+            _DET_DB = _postgres_stores(url).detections
+            _DET_KEY = url
+        return _DET_DB
     path = parse_sqlite_path(url or "")
     if not path:
         return None
-    if _DET_DB is None or _DET_DB.path != path:
+    if _DET_DB is None or _DET_KEY != path:
         _DET_DB = DetectionStore(path)
+        _DET_KEY = path
     return _DET_DB
 
 
 def reset_sensor_db() -> None:
-    global _SENSOR_DB, _DET_DB
+    global _SENSOR_DB, _DET_DB, _SENSOR_KEY, _DET_KEY
     _SENSOR_DB = None
     _DET_DB = None
+    _SENSOR_KEY = None
+    _DET_KEY = None

@@ -1,0 +1,38 @@
+# PostGIS backend for the Ops Station (OPTIONAL; SQLite stays the default).
+#
+#   docker compose -f ground_iot/docker-compose.postgis.yml up -d
+#   export DATABASE_URL=postgresql://agriedge:${POSTGRES_PASSWORD}@127.0.0.1:5432/agriedge
+#
+# STATUS: SIMULATED. This file has not been run against a production host; the
+# PostgisStore code is tested only against a throwaway local PostGIS.
+#
+# POSTGRES_PASSWORD has NO default on purpose: compose refuses to start without it,
+# so a committed password can never be the one in use. Bound to loopback only.
+# Do NOT expose 5432 to a farm LAN without TLS + a real role/ACL design.
+#
+# The init script is the same docs/operations/schema_postgis.sql the code uses.
+# Postgres runs /docker-entrypoint-initdb.d/*.sql only on an EMPTY data volume;
+# PostgisStore.ensure_schema() is idempotent and covers later additions.
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: agriedge-postgis
+    environment:
+      POSTGRES_DB: agriedge
+      POSTGRES_USER: agriedge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (no default, by design)}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ../docs/operations/schema_postgis.sql:/docker-entrypoint-initdb.d/10_schema_postgis.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agriedge -d agriedge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgis_data:
