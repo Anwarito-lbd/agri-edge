@@ -71,6 +71,8 @@ def irrigation_dashboard(store: Any) -> dict[str, Any]:
         "avg_moisture_pct": avg,
         "recommendation": rec.to_dict(),
         "zones": zone_table(store),
+        # Latest controller STATE received over ground MQTT (read-only mirror).
+        "controller_state": list((getattr(store, "irrigation_state", None) or {}).values()),
         "safety": {
             "ai_unrestricted_pump": False,
             "command_channel": "mqtt_ground_only",

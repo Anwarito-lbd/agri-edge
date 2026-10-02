@@ -63,6 +63,26 @@ Implementation + tests + docs + no secrets. Hardware tasks need explicit VALIDAT
 - Physical spray / actuator
 - Field radios
 
+## Phase status table — 2026-10-01
+
+Phase status key: DONE / SIMULATED / BENCH / BLOCKED-HARDWARE. Updated 2026-10-01.
+
+| Phase | Status | Evidence / note |
+|-------|--------|-----------------|
+| Ops Station §79–166 | **DONE** 88/88 sim-complete | `docs/operations/PHASE_CHECKLIST_79_166.md`; simulation only, not field-validated |
+| MQTT ingest (subscribe-only) | **SIMULATED** | `src/agri_edge/ops/live_ingest.py`, `scripts/ops_mqtt_ingest.py`, [`docs/operations/MQTT_INGEST.md`](operations/MQTT_INGEST.md); in-memory broker; real-broker test skipped without a broker |
+| PostGIS backend option | **SIMULATED** | `src/agri_edge/ops/postgis.py`, [`docs/operations/POSTGIS_BACKEND.md`](operations/POSTGIS_BACKEND.md); SQLite remains the default; live tests skipped without a PostGIS |
+| PostGIS compose file never run | **SIMULATED** (never run) | `ground_iot/docker-compose.postgis.yml` has never been started; nothing run against production PostGIS |
+| Georeferencing (pose-validated) | **SIMULATED** | `src/agri_edge/geo/georef.py`; unit-tested maths, no real camera/GNSS |
+| Treatment decision engine + simulated actuator | **SIMULATED** | `src/agri_edge/decision/engine.py`; fail-closed gates, simulated actuator only |
+| farmOS and AgOpenGPS adapter stubs | **SIMULATED** | `src/agri_edge/adapters/`; stubs, no network / no I/O |
+| Live Pi camera | **BLOCKED-HARDWARE** | no Pi camera on hand |
+| Real HEF + HailoRT on the AI HAT | **BLOCKED-HARDWARE** | needs Pi + AI HAT + HailoRT + a compiled `.hef` |
+| Actuators and pumps | **BLOCKED-HARDWARE** | no physical treatment hardware |
+| Field radios | **BLOCKED-HARDWARE** | no radios / gateways deployed |
+
+No row in this table has hardware or field evidence; none is claimed as validated.
+
 ### Safety reminders
 - No YOLO/LLM → motors
 - Companion MAVLink read-only unless behind VehicleAdapter + safety supervisor (fail closed)

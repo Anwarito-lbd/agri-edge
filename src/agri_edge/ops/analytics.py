@@ -121,11 +121,26 @@ def application_analytics(store: Any) -> dict[str, Any]:
     detected = sum(1 for e in events if e.kind in ("weed_detected", "detected"))
     treated = sum(1 for e in events if e.kind in ("treated", "weed_treated"))
     skipped = sum(1 for e in events if e.kind in ("skipped", "weed_skipped"))
+    # Outside-geofence is a SUBSET of skipped (reason carries the code); skip_reasons
+    # explains why we declined. Both come from decision.engine's event log (SIMULATED).
+    outside = sum(
+        1 for e in events
+        if e.kind in ("skipped", "weed_skipped") and "OUTSIDE_TREATMENT_GEOFENCE" in (e.reason or "")
+    )
+    skip_reasons: dict[str, int] = {}
+    for e in events:
+        if e.kind in ("skipped", "weed_skipped") and e.reason:
+            for r in str(e.reason).split(","):
+                r = r.strip()
+                if r:
+                    skip_reasons[r] = skip_reasons.get(r, 0) + 1
     return {
         "metric": "application",
         "weeds_detected": detected,
         "weeds_treated": treated,
         "weeds_skipped": skipped,
+        "weeds_outside_geofence": outside,
+        "skip_reasons": skip_reasons,
         "events": [e.to_dict() for e in events],
         "ha_treated": round(treated * 0.001, 4),  # sim cell area proxy
         "formula": "count(VisionTreatmentEvent.kind) from sim vision + treatment",
