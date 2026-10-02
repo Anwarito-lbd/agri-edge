@@ -246,6 +246,13 @@ class OpsHandler(BaseHTTPRequestHandler):
                     "channel": "mqtt_subscribe_only",
                     "status": "SIMULATED",
                 })
+            if path == "/api/ops/decisions":
+                from .decisions import decisions_report
+                try:
+                    limit = int((qs.get("limit") or ["50"])[0])
+                except ValueError:
+                    raise BadRequest("limit must be an integer") from None
+                return _json(self, 200, decisions_report(store, limit=limit))
             if path == "/api/ops/sensors":
                 return _json(self, 200, {
                     **_banner(store),
@@ -434,6 +441,7 @@ class OpsHandler(BaseHTTPRequestHandler):
                         {"id": "sensors", "path": "/ops/sensors.html", "release": 1},
                         {"id": "alerts", "path": "/ops/alerts.html", "release": 1},
                         {"id": "irrigation", "path": "/ops/irrigation.html", "release": 2},
+                        {"id": "decisions", "path": "/ops/decisions.html", "release": 2, "read_only": True},
                         {"id": "vra", "path": "/api/ops/vra", "release": 3},
                         {"id": "kpi", "path": "/api/ops/kpi", "release": 4},
                         {"id": "3d", "path": "/api/ops/3d", "release": 5, "stub": False, "path_ui": "/ops/map3d.html"},

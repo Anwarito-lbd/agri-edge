@@ -1,0 +1,82 @@
+name: live-services
+
+# NOT ACTIVE while it lives in docs/ci/ -- see docs/ci/README.md to enable.
+#
+# Runs the tests that are SKIPPED everywhere else because they need real services:
+#   tests/test_ops_postgis.py        (real PostgreSQL + PostGIS)
+#   tests/test_ops_ingest_broker.py  (real Mosquitto)
+#   tests/test_live_services_e2e.py  (both together)
+#
+# Label: BENCH. Throwaway CI containers/processes with synthetic data; this is not
+# production PostGIS and not a farm broker. Nothing here is VALIDATED.
+#
+# Why Mosquitto from apt and not an `eclipse-mosquitto` service container: a service
+# container cannot mount a config file, and mosquitto 2.x only listens on localhost
+# without one, so the broker would be unreachable from the runner.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  live:
+    name: real PostGIS + real Mosquitto
+    runs-on: ubuntu-latest
+
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: agriedge_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_throwaway_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d agriedge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      AGRIEDGE_TEST_PG_URL: postgresql://postgres:ci_throwaway_only@127.0.0.1:5432/agriedge_test
+      AGRIEDGE_TEST_MQTT: 127.0.0.1:18830
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Mosquitto and start a throwaway broker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mosquitto
+          printf 'listener 18830 127.0.0.1\nallow_anonymous true\n' > /tmp/mosq.conf
+          /usr/sbin/mosquitto -c /tmp/mosq.conf -d
+          for i in $(seq 1 20); do
+            (echo > /dev/tcp/127.0.0.1/18830) 2>/dev/null && break
+            sleep 0.5
+          done
+          (echo > /dev/tcp/127.0.0.1/18830) 2>/dev/null
+
+      - name: Install the package, paho and psycopg
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,mqtt]"
+          pip install "psycopg[binary]"
+
+      - name: Run the live-service tests
+        # A skip here would be a silent green, so the step fails on any skip.
+        run: |
+          pytest tests/test_ops_postgis.py tests/test_ops_ingest_broker.py \
+                 tests/test_live_services_e2e.py -q -rs | tee /tmp/live.txt
+          grep -qE "[0-9]+ passed" /tmp/live.txt
+          if grep -qE "skipped" /tmp/live.txt; then
+            echo "A live-service test skipped -- the service was not reachable."
+            exit 1
+          fi

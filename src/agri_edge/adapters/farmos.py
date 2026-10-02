@@ -1,9 +1,14 @@
 """FarmManagementAdapter interface + FarmOSAdapter stub.
 
-STATUS: SIMULATED / stub. `FarmOSAdapter` BUILDS farmOS JSON:API payloads and keeps
-them in an outbox. It makes **no network call** unless constructed with a real
-`FarmOSClient` AND `allow_network=True` -- two deliberate opt-ins, because pushing
-logs to someone's farm record system is an externally visible act.
+STATUS: payload building SIMULATED; the HTTP path is IMPLEMENTED but only mock-tested
+(`adapters/farmos_http.py`, `tests/test_farmos_http.py`) -- never run against a real farmOS.
+
+`FarmOSAdapter` BUILDS farmOS JSON:API payloads and keeps them in an outbox. It makes
+**no network call** unless constructed with a client AND `allow_network=True` -- two
+deliberate opt-ins, because pushing logs to someone's farm record system is an
+externally visible act. Reading fields/plantings (`list_fields`, `list_plantings`) is
+gated by the same opt-in. Build a networked adapter with `FarmOSAdapter.from_config(cfg,
+allow_network=True)`; see docs/operations/FARMOS_ADAPTER.md.
 
 Payload construction reuses `store.farmos.sidecar_to_log` (already tested) for
 observation logs, so there is one definition of "what a detection log looks like".
@@ -20,7 +25,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from agri_edge.store.farmos import sidecar_to_log
 
-ADAPTER_STATUS = "SIMULATED"
+ADAPTER_STATUS = "SIMULATED"      # payload builders; see farmos_http.py for the (mock-tested) client
 
 
 class FarmOSNetworkDisabled(RuntimeError):
@@ -42,6 +47,15 @@ class FarmManagementAdapter(Protocol):
     def flush(self) -> list[str]: ...
 
 
+@runtime_checkable
+class FarmDataReader(Protocol):
+    """Optional read side: what fields/plantings does the farm system hold?"""
+
+    def list_fields(self) -> list: ...
+
+    def list_plantings(self) -> list: ...
+
+
 class FarmOSAdapter:
     name = "farmos"
     status = ADAPTER_STATUS
@@ -54,9 +68,39 @@ class FarmOSAdapter:
         self.outbox: list[dict] = []
         self.sent_ids: list[str] = []
 
+    @classmethod
+    def from_config(cls, cfg: Any, *, allow_network: bool = False,
+                    land_asset_id: str = "") -> "FarmOSAdapter":
+        """Build an adapter around the real HTTP client.
+
+        With `allow_network=False` (the default) no client is even constructed, so nothing
+        can reach the network and credentials are not validated or touched.
+        """
+        if not allow_network:
+            return cls(None, allow_network=False,
+                       land_asset_id=land_asset_id or getattr(cfg, "land_asset_id", ""))
+        from .farmos_http import FarmOSHttpClient     # lazy: keeps this module I/O-free
+
+        return cls(FarmOSHttpClient(cfg), allow_network=True,
+                   land_asset_id=land_asset_id or getattr(cfg, "land_asset_id", ""))
+
     @property
     def network_enabled(self) -> bool:
         return self._client is not None and self.allow_network
+
+    def _require_network(self, what: str) -> None:
+        if not self.network_enabled:
+            raise FarmOSNetworkDisabled(
+                f"FarmOSAdapter will not {what}: construct with a client AND allow_network=True.")
+
+    # -- reads (network opt-in required) ----------------------------------------------
+    def list_fields(self) -> list:
+        self._require_network("read fields")
+        return list(self._client.list_land_assets())
+
+    def list_plantings(self) -> list:
+        self._require_network("read plantings")
+        return list(self._client.list_plant_assets())
 
     # -- payload builders (pure) -------------------------------------------------
     def build_observation_log(self, frame_meta: dict, *, land_asset_id: str = "") -> dict:
