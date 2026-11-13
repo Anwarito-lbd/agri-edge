@@ -1,0 +1,15 @@
+{
+  "name": "agri-edge Operations Station",
+  "short_name": "agri-edge",
+  "description": "Recommendations, alerts, fields and maps for the farm — works offline with the last data seen.",
+  "start_url": "/ops/recommendations",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#EEF2F6",
+  "theme_color": "#173D68",
+  "lang": "en",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

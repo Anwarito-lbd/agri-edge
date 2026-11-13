@@ -1,0 +1,175 @@
+{
+  "mode": "SIMULATED",
+  "validated_locally": false,
+  "airframe": {
+    "airframe_baseline": {
+      "fov": {
+        "half_width_deg": 37.97526787689327,
+        "half_height_deg": 30.33011551703414,
+        "half_diagonal_deg": 44.289678772196176
+      },
+      "rotors": {
+        "wheelbase_mm": 650.0,
+        "prop_diameter_in": 15.0,
+        "adjacent_spacing_mm": 459.61940777125585,
+        "tip_gap_mm": 78.61940777125587,
+        "tip_gap_pct": 20.635015163059283,
+        "max_prop_in": 16.450229340417174
+      },
+      "mass_g": 3432,
+      "mass_by_group": {
+        "airframe": 1100.0,
+        "propulsion": 600.0,
+        "avionics": 145.0,
+        "energy": 1250.0,
+        "payload": 337.0
+      },
+      "performance": {
+        "auw_kg": 3.432,
+        "thrust_to_weight": 2.5641025641025643,
+        "hover_throttle_fraction": 0.39,
+        "hover_power_w": 411.3333333333333,
+        "endurance_min": 23.550906144099013,
+        "survey_min": 20.550906144099013,
+        "coverage_ha_h": 67.44303797468355,
+        "ha_per_battery": 23.10025905817712,
+        "max_exposure_ms": 2.309439992010586,
+        "gsd_cm_px": 1.154719996005293,
+        "swath_m": 46.835443037974684,
+        "estimated_fraction": 1.0
+      },
+      "legs": {
+        "lens_height_above_feet_m": 0.16,
+        "leg_radius_m": 0.26,
+        "required_m": 0.1248945147679325,
+        "required_per_leg_m": [
+          0.1248945147679325,
+          0.09360930100949576,
+          0.1248945147679325,
+          0.09360930100949576
+        ],
+        "binding_leg_azimuth_deg": 0.0,
+        "required_worst_azimuth_m": 0.1560812001959355,
+        "margin_m": 0.1351054852320675,
+        "in_frame": false
+      },
+      "vibration": {
+        "blade_pass_hover_hz": 153.33333333333334,
+        "blade_pass_full_hz": 226.66666666666666,
+        "isolator_target_hz": 35.0,
+        "isolation_ratio": 4.380952380952381,
+        "isolator_k_n_per_mm_each": 3.868884925227028,
+        "static_sag_mm": 0.20284914521047628,
+        "adequate": true,
+        "frame_mode_should_exceed_hz": 226.66666666666666
+      },
+      "checks": [
+        {
+          "label": "Under 25 kg (Transport Canada small RPAS)",
+          "pass": true,
+          "detail": "3.43 kg all-up"
+        },
+        {
+          "label": "Thrust-to-weight at least 2.0",
+          "pass": true,
+          "detail": "2.56:1"
+        },
+        {
+          "label": "Hover under 60% of available thrust",
+          "pass": true,
+          "detail": "39% at hover"
+        },
+        {
+          "label": "Propeller tip gap at least 10% of diameter",
+          "pass": true,
+          "detail": "79 mm (21%)"
+        },
+        {
+          "label": "Landing gear outside the view pyramid",
+          "pass": true,
+          "detail": "feet at 260 mm, worst leg needs 125 mm (156 mm at a pyramid corner)"
+        },
+        {
+          "label": "Isolator at least 3x below blade-pass",
+          "pass": true,
+          "detail": "153 Hz at hover vs 35 Hz mount (4.4x)"
+        },
+        {
+          "label": "Exposure achievable at survey speed",
+          "pass": true,
+          "detail": "2.3 ms for 1 px of smear at 5 m/s"
+        }
+      ]
+    },
+    "auws_kg_range": [
+      3.432,
+      4.832
+    ],
+    "max_payload_for_twr_2_0_g": 950,
+    "endurance_10ah_min_at_baseline": 23.55,
+    "endurance_16ah_min_at_baseline": 37.68
+  },
+  "georeference_3d": {
+    "origin_lat_lon": [
+      50.4452,
+      -104.6189
+    ],
+    "plan": {
+      "lines": 7,
+      "heading_deg": 0.0,
+      "swath_m": 46.835443037974684,
+      "overlap": 0.2,
+      "effective_swath_m": 37.47,
+      "area_ha": 9.12,
+      "line_distance_m": 2490,
+      "turn_distance_m": 225,
+      "total_distance_m": 2715
+    },
+    "coverage_gaps_fraction": 0.0,
+    "shift_at_10deg_roll_30m_agl_m": 5.29,
+    "geofence_allowed_points": 2,
+    "geofence_blocked_points": 2
+  },
+  "spray_and_drift": {
+    "airframe_wind_rejection": {
+      "status": "unknown",
+      "reason": "wind reported from the airframe, which sits in its own downwash. That number describes the rotors, not the weather."
+    },
+    "bench_point_20lha_8ms_8m_l_min": 7.68,
+    "raw_coverage_rate_8ms_8m_ha_h": 23.04
+  },
+  "ml_and_optics": {
+    "model_cards": {
+      "aerial_sheep_yolox_s": {
+        "ap50": 0.9049,
+        "ap50_95": 0.4664,
+        "test_gt_boxes": 5603
+      },
+      "imageweeds_yolox_s_species": {
+        "ap50": 0.457,
+        "ap50_95": 0.259,
+        "test_gt_boxes": 306
+      },
+      "imageweeds_yolox_s_binary": {
+        "ap50": 0.673,
+        "ap50_95": 0.375,
+        "test_gt_boxes": 306
+      },
+      "weed_crop_yolox_s": {
+        "ap50": 0.6893,
+        "ap50_95": 0.3924,
+        "test_gt_boxes": 781,
+        "caveat": "98.3% crop in indoor trays"
+      }
+    },
+    "imx708_downscale_factor": 7.2,
+    "imx708_native_gsd_30m_cm": 0.886,
+    "max_exposure_5ms_30m_ms": 2.309
+  },
+  "generated_plots": [
+    "docs/proof/airframe_endurance_physics.png",
+    "docs/proof/georef_3d_trajectory.png",
+    "docs/proof/spray_drift_envelope.png",
+    "docs/proof/ml_models_optics_envelope.png"
+  ]
+}

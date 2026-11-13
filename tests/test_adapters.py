@@ -169,7 +169,13 @@ def test_adapters_import_no_network_or_hardware_modules_at_all():
                  "subprocess", "asyncio", "ssl"}
     root = Path(FarmOSAdapter.__module__.replace(".", "/")).parent
     import agri_edge.adapters as pkg
+    # The two modules that ARE the I/O layer are allowed their transports and are checked on
+    # their own terms (tests/test_farmos_http.py, tests/test_agopengps.py). Every other module
+    # in the package stays I/O-free.
+    io_modules = {"farmos_http.py", "agopengps_udp.py"}
     for py in Path(pkg.__file__).parent.glob("*.py"):
+        if py.name in io_modules:
+            continue
         tree = ast.parse(py.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             names = []

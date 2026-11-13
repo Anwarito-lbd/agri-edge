@@ -11,14 +11,21 @@ from .agopengps import (
     GuidanceState,
     GuidanceTrack,
 )
+from .agopengps_pgn import PgnParseError
+from .agopengps_udp import AgOpenGpsReadOnlyAdapter, AgOpenGpsUdpListener
 from .farmos import (
+    FarmDataReader,
     FarmManagementAdapter,
     FarmOSAdapter,
     FarmOSNetworkDisabled,
 )
 
 __all__ = [
+    "AgOpenGpsReadOnlyAdapter",
+    "AgOpenGpsUdpListener",
+    "PgnParseError",
     "AgOpenGpsAdapterStub",
+    "FarmDataReader",
     "FarmManagementAdapter",
     "FarmOSAdapter",
     "FarmOSNetworkDisabled",

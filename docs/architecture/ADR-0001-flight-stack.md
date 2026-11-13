@@ -18,3 +18,6 @@ Until an explicit product decision + safety supervisor lands: **Pi must not writ
 ## Consequences
 - Short-term: finish `sitl.sh` on WSL; wrap reads behind adapter.
 - Medium-term: ADR update if PX4 wins bake-off (SITL, ROS2, licensing, hardware).
+
+## Update 2026-10-02
+PX4 evaluation criteria, evidence labels and a proposed bake-off are in [`px4-evaluation.md`](px4-evaluation.md). **The decision above is unchanged:** ArduPilot SITL is the primary path; PX4 stays a long-term evaluation and nothing has been run on it.

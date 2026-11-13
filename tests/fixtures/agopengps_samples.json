@@ -1,0 +1,13 @@
+{
+  "provenance": "SIMULATED: constructed from PGN.md field list; not captured from real AgOpenGPS",
+  "source": "https://github.com/AgOpenGPS-Official/Boards/blob/main/PGN.md",
+  "packets": {
+    "gps_rtk_fix": "80817cd6330d71ac8bdb4858c0265305a392f248400000b4420000b7420000a8400000c03f66666e43120004550078000000000000000000d8",
+    "gps_no_fix": "80817cd6330000000000000000000000000000000000000000000000000000000000000000000000000000000f270f270000000000000000f1",
+    "steer_data": "80817ffe084b00012efb82050283",
+    "from_autosteer": "80817efd082efb8403ceff014d4e",
+    "from_imu": "808179d3080807e7ff0700000050",
+    "machine": "80817fef08003401000000ff00aa",
+    "hello_unmodelled": "80817fc8037e0000c8"
+  }
+}

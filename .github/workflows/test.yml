@@ -114,12 +114,51 @@ jobs:
         run: make build
 
   # ---------------------------------------------------------------------------
-  # The operations station is a separate repository (Anwarito-lbd/agri-edge-web)
-  # and is NOT built here. The 19 Sept audit recorded that it has no tests and
-  # no CI of its own, with a command-proxy route as its least-covered surface;
-  # that workflow belongs in that repo. This comment is here so the gap stays
-  # visible rather than being forgotten because nothing references it.
+  # Unified Operations Station & Farmer Web App (apps/web, merged from
+  # Anwarito-lbd/agri-edge-web). Runs Vitest, TypeScript, ESLint, and Next build.
   # ---------------------------------------------------------------------------
+  web:
+    name: web (Next.js / Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Run Vitest suite
+        run: |
+          npx vitest run --reporter=json --outputFile=vitest-results.json
+          node -e "
+            const r = require('./vitest-results.json');
+            const passed = r.numPassedTests ?? 0;
+            const failed = r.numFailedTests ?? 0;
+            const total  = r.numTotalTests ?? 0;
+            console.log(\`vitest: \${passed} passed, \${failed} failed, \${total} total\`);
+            if (total === 0) { console.error('No tests ran.'); process.exit(1); }
+            if (failed > 0)  { console.error('Failing tests.'); process.exit(1); }
+          "
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          OPS_API_URL: http://127.0.0.1:1
 
   # Second job, deliberately separate. The lean job above proves the Pi runtime
   # installs with numpy + PyYAML alone; this one proves the code that NEEDS the

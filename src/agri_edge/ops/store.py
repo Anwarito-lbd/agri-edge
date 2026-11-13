@@ -92,6 +92,9 @@ class OpsStore:
         self.lock = threading.RLock()
         # Filled in by ops.live_ingest.OpsIngestor when one is attached.
         self.ingest_stats: dict = {}
+        # Read-only snapshot of the treatment decision engine's log/state
+        # (ops/decisions.py). Plain data: no engine or actuator handle lives here.
+        self.decision_view: Any = None
         self.sqlite_path = sqlite_path
         if sqlite_path:
             self._init_sqlite(sqlite_path)

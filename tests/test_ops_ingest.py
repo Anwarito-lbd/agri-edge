@@ -193,7 +193,7 @@ def test_stuck_sensor_detected_across_messages(rig):
     (b"[1,2]", "payload_not_object"),
     (b"null", "payload_not_object"),
     (b"{}", "ts_missing"),
-    (b"x" * (70 * 1024), "payload_too_large"),
+    pytest.param(b"x" * (70 * 1024), "payload_too_large", id="oversized_70kb"),
 ])
 def test_malformed_payloads_rejected(rig, raw, why):
     store, t, ing = rig

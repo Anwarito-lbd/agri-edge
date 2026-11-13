@@ -1,6 +1,6 @@
 # Ops Station — live MQTT ingest
 
-**Status: SIMULATED.** Exercised against an in-memory broker in tests, and (optionally) a local Mosquitto with synthetic publishers (`tests/test_ops_ingest_broker.py`, skipped when no broker is reachable). No real sensor, gateway, radio or farm network has ever fed it. Not validated against any real hardware or farm.
+**Status: BENCH** (real Mosquitto 2.0.21 on the build box, 2026-10-02; see "Live-service run" in POSTGIS_BACKEND.md). Exercised against an in-memory broker in tests, and a local Mosquitto with synthetic publishers (`tests/test_ops_ingest_broker.py`, skipped when no broker is reachable). No real sensor, gateway, radio or farm network has ever fed it. Not validated against any real hardware or farm.
 
 Code: `src/agri_edge/ops/live_ingest.py` (`OpsIngestor`, `IngestConfig`), `src/agri_edge/iot/transport.py` (transports), `src/agri_edge/iot/mqtt_topics.py` (topic parsing). Topic contract: `docs/MQTT_CONTRACT.md` ("Operations Station topics").
 
