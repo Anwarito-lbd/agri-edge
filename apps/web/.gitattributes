@@ -1,0 +1,30 @@
+# Line endings decided here, not by whoever cloned the repo.
+#
+# The sibling repository lost two shell scripts to this: `core.autocrlf=true`
+# is the Windows default, and with no .gitattributes every checkout rewrote LF
+# to CRLF. That is harmless for TypeScript and fatal for anything a Linux shell
+# executes -- bash reads the carriage return as part of the last token, so
+# `set -euo pipefail` becomes `pipefail<CR>`.
+#
+# Nothing here runs under bash yet. The rule is in place before something does,
+# because the failure is invisible in an editor and in `git diff`.
+
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.mjs       text eol=lf
+*.json      text eol=lf
+*.css       text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.webp      binary
+*.ico       binary
+*.woff      binary
+*.woff2     binary

@@ -45,3 +45,12 @@ ground_iot/mosquitto/passwd
 # Per-farm device registry and per-device firmware secrets (iot/provision.py)
 ground_iot/mosquitto/devices.json
 ground_iot/firmware/esphome/secrets.yaml
+
+# Unified web app (apps/web) build & dependency artifacts
+apps/web/node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/tsconfig.tsbuildinfo
+apps/web/vitest-results.json
+apps/web/.env*
+!apps/web/.env.example

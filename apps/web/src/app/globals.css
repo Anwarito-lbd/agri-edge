@@ -1,0 +1,499 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+@import "../styles/tokens.css";
+@import "./v2.css";
+@import "./ops-v2.css";
+
+:root {
+  /* Design v2 tokens live in ../styles/tokens.css (--ae-primary, --ae-navy, --ae-paper, ...).
+     Below: the names older pages already use, now pointing at the v2 values, plus
+     app-only variables that the design does not define. */
+
+  /* Brand blues (legacy names -> v2) */
+  --ae-blue-primary: var(--ae-primary);
+  --ae-blue-theme: var(--ae-blue-mid);
+  --ae-blue-nav-strip: var(--ae-navy);
+  --ae-blue-ink: var(--ae-navy);
+  --ae-blue-night: var(--ae-night);
+  --ae-blue-nav-link: var(--ae-primary-dark);
+  --ae-cyan-accent: var(--ae-cyan);
+  --ae-blue-deep: #0A539A;
+  --ae-blue-dark: #1A4E88;
+  --ae-blue-nav-hover: #003F78;
+  --ae-hero-scrim: #0B101C;
+  --ae-ops-slate: #1B2430;
+  --ae-ops-panel: #232D3B;
+
+  /* Neutrals */
+  --ae-text-muted: var(--ae-muted);
+  --ae-bg: var(--ae-white);
+  --ae-bg-subtle: var(--ae-surface);
+  --ae-border-focus: var(--ae-primary);
+  --ae-selection: #B3D4FC;
+
+  /* Status only */
+  --ae-status-ok: var(--ae-ok);
+  --ae-status-warn: var(--ae-warn);
+  --ae-status-critical: var(--ae-critical);
+  --ae-status-info: #715DA3;
+
+  --ae-underline-w: 50px;
+  --ae-underline-h: 6px;
+  --ae-max-content: var(--ae-container);
+  --ae-control-h-app: 40px;
+  --ae-space-section: clamp(2rem, 4vw, 3.75rem);
+
+  --background: var(--ae-bg);
+  --foreground: var(--ae-text);
+  --primary: var(--ae-primary);
+  --primary-hover: var(--ae-primary-dark);
+  --ink: var(--ae-navy);
+  --night: var(--ae-night);
+  --nav-strip: var(--ae-navy);
+  --cyan: var(--ae-cyan);
+  --muted: var(--ae-muted);
+  --surface: var(--ae-surface);
+  --border: var(--ae-border);
+  --danger: var(--ae-critical);
+  --warning: var(--ae-warn);
+  --ok: var(--ae-ok);
+  --hero-scrim: var(--ae-hero-scrim);
+  --ops-slate: var(--ae-ops-slate);
+  --ops-panel: var(--ae-ops-panel);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-ink: var(--ink);
+  --color-night: var(--night);
+  --color-nav-strip: var(--nav-strip);
+  --color-cyan: var(--cyan);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-ok: var(--ok);
+  --color-hero-scrim: var(--hero-scrim);
+  --color-ops-slate: var(--ops-slate);
+  --color-ops-panel: var(--ops-panel);
+  --font-sans: var(--font-inter);
+  --color-primary-dark: var(--ae-primary-dark);
+  --color-navy: var(--ae-navy);
+  --color-blue-mid: var(--ae-blue-mid);
+  --color-blue-light: var(--ae-blue-light);
+  --color-paper: var(--ae-paper);
+  --color-paper-line: var(--ae-paper-line);
+  --color-chart-line: var(--ae-chart-line);
+  --color-ok-tint: var(--ae-ok-tint);
+  --color-warn-tint: var(--ae-warn-tint);
+  --color-critical: var(--ae-critical);
+  --color-critical-tint: var(--ae-critical-tint);
+  --color-sim-bg: var(--ae-sim-bg);
+  --color-sim-border: var(--ae-sim-border);
+  --color-sim-text: var(--ae-sim-text);
+  --font-mono: var(--ae-mono);
+  --radius-card: var(--ae-radius-card);
+  --radius-ctl: var(--ae-radius-ctl);
+  --ease-ae: var(--ae-ease);
+}
+
+::selection {
+  background: var(--ae-selection);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+  -webkit-text-size-adjust: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  background: var(--ae-bg);
+  color: var(--ae-text);
+  font-family: var(--ae-font);
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.container-page {
+  width: 100%;
+  max-width: var(--ae-max-content);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+@media (min-width: 640px) {
+  .container-page {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+.section {
+  padding-top: var(--ae-space-section);
+  padding-bottom: var(--ae-space-section);
+}
+
+.page-title {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ae-blue-ink);
+}
+
+.section-title {
+  font-size: clamp(1.375rem, 2.2vw, 2rem);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--ae-blue-ink);
+}
+
+.section-title-accent {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.85rem;
+}
+.section-title-accent::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--ae-underline-w);
+  height: var(--ae-underline-h);
+  background: var(--ae-cyan-accent);
+  border-radius: 2.5px;
+}
+
+.eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ae-text-muted);
+}
+
+.lede {
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  color: var(--ae-text-muted);
+  max-width: 38rem;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ae-control-h-app);
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--ae-radius-pill);
+  background: var(--ae-blue-primary);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  transition: background 0.15s ease;
+}
+.btn-primary:hover {
+  background: var(--ae-blue-nav-link);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ae-control-h-app);
+  padding: 0.5rem 1.5rem;
+  border-radius: var(--ae-radius-pill);
+  background: #fff;
+  color: var(--ae-blue-primary);
+  font-size: 1rem;
+  font-weight: 500;
+  border: 2px solid var(--ae-blue-primary);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-secondary:hover {
+  background: var(--ae-bg-subtle);
+}
+
+/* NAV-style text + circular arrow CTA */
+.cta-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.875rem;
+  color: #fff;
+  font-size: 1.0625rem;
+  font-weight: 500;
+}
+.cta-nav:hover .cta-nav-label {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.cta-nav-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  background: var(--ae-blue-primary);
+  color: #fff;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.cta-nav:hover .cta-nav-circle {
+  background: var(--ae-blue-light);
+  transform: translateX(2px);
+}
+.cta-nav-circle svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ae-blue-primary);
+  font-size: 1rem;
+  font-weight: 500;
+}
+.link-arrow:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--ae-border);
+}
+
+.notice {
+  border-left: 3px solid var(--ae-blue-primary);
+  background: var(--ae-bg-subtle);
+  padding: 0.875rem 1.125rem;
+  font-size: 0.875rem;
+  color: var(--ae-text-muted);
+  line-height: 1.45;
+}
+
+.notice-safety {
+  border-left: 3px solid var(--ae-status-critical);
+  background: #fdf2f2;
+  padding: 0.875rem 1.125rem;
+  font-size: 0.875rem;
+  color: var(--ae-text);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.table-inst thead {
+  background: var(--ae-bg-subtle);
+  border-bottom: 1px solid var(--ae-border);
+}
+.table-inst th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ae-text-muted);
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+.table-inst td {
+  padding: 0.875rem 1rem;
+  border-top: 1px solid var(--ae-border);
+  font-size: 0.875rem;
+  color: var(--ae-text-muted);
+  vertical-align: top;
+}
+.table-inst td.emph {
+  color: var(--ae-text);
+}
+
+.phone-frame {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--ae-ops-slate);
+  color: #e8edf2;
+  box-shadow: 0 16px 40px rgba(11, 16, 28, 0.35);
+}
+.phone-panel {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--ae-ops-panel);
+}
+.ops-hairline {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Leaflet dark/muted map */
+.demo-map {
+  height: 100%;
+  min-height: 22rem;
+  width: 100%;
+  /* Neutral ground: what shows if the basemap tiles fail to load. */
+  background: #dde3ea;
+  /* Light OSM tiles, slightly desaturated to sit with the institutional palette. */
+  filter: grayscale(0.55) contrast(1.02);
+}
+.demo-map .leaflet-container {
+  background: #dde3ea;
+  font-family: var(--ae-font);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 2px;
+  font-size: 0.8125rem;
+}
+
+
+/* Full-bleed ops dashboard map */
+.dash-map-shell {
+  position: relative;
+  height: calc(100vh - 5.75rem);
+  min-height: 28rem;
+  background: var(--ae-ops-slate);
+  overflow: hidden;
+}
+@media (min-width: 768px) {
+  .dash-map-shell {
+    height: calc(100vh - 6.5rem);
+  }
+}
+.dash-map-shell .demo-map {
+  min-height: 100%;
+  height: 100%;
+  filter: grayscale(0.55) contrast(1.02);
+}
+.dash-float {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: auto;
+}
+.dash-kpi-strip {
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: min(11.5rem, calc(100% - 1.5rem));
+}
+.dash-kpi-card {
+  background: rgba(27, 36, 48, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  padding: 0.55rem 0.7rem;
+  color: #fff;
+}
+.dash-det-panel {
+  top: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  width: min(17.5rem, calc(100% - 1.5rem));
+  display: none;
+  flex-direction: column;
+  background: rgba(27, 36, 48, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  overflow: hidden;
+}
+@media (min-width: 900px) {
+  .dash-det-panel {
+    display: flex;
+  }
+}
+.dash-honesty {
+  position: absolute;
+  z-index: 1000;
+  left: 50%;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  max-width: min(36rem, calc(100% - 1.5rem));
+  background: rgba(27, 36, 48, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+/* Denser companion shell (CFPS-like ops density) */
+.app-dense {
+  padding-top: 1.25rem;
+  padding-bottom: 1.75rem;
+}
+@media (min-width: 640px) {
+  .app-dense {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+  }
+}
+.phone-frame-dense {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--ae-ops-slate);
+  color: #e8edf2;
+  box-shadow: 0 10px 28px rgba(11, 16, 28, 0.28);
+  max-width: 300px;
+}
+.phone-frame-dense .phone-panel {
+  border-width: 1px;
+}
+
+/* Vision / roadmap capability badges (NAV CANADA tokens) */
+.badge-ship,
+.badge-demo,
+.badge-next,
+.badge-hw,
+.badge-later {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 2px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.badge-ship {
+  background: rgba(31, 170, 146, 0.12);
+  color: var(--ae-status-ok);
+  border: 1px solid rgba(31, 170, 146, 0.35);
+}
+.badge-demo {
+  background: rgba(0, 166, 220, 0.1);
+  color: var(--ae-cyan-accent);
+  border: 1px solid rgba(0, 166, 220, 0.35);
+}
+.badge-next {
+  background: rgba(0, 110, 176, 0.08);
+  color: var(--ae-blue-primary);
+  border: 1px solid rgba(0, 110, 176, 0.3);
+}
+.badge-hw {
+  background: rgba(244, 121, 59, 0.1);
+  color: var(--ae-status-warn);
+  border: 1px solid rgba(244, 121, 59, 0.35);
+}
+.badge-later {
+  background: var(--ae-bg-subtle);
+  color: var(--ae-text-muted);
+  border: 1px solid var(--ae-border);
+}

@@ -15,7 +15,8 @@ PYTHON ?= python
 PYTEST ?= $(PYTHON) -m pytest
 
 .PHONY: help bootstrap lint format typecheck test test-unit test-integration \
-        test-ops build docker-up docker-down sitl hailo-smoke edge-run clean
+        test-ops build docker-up docker-down sitl hailo-smoke edge-run \
+        simulate-physics web-install web-test web-build clean
 
 help:
 	@echo "bootstrap        install the package and dev tooling"
@@ -100,6 +101,18 @@ hailo-smoke:
 edge-run:
 	$(PYTHON) -m agri_edge.cli -c config/pi.yaml fly --sitl --frames 20
 
+simulate-physics:
+	$(PYTHON) scripts/simulate_airframe_physics.py
+
+web-install:
+	cd apps/web && npm ci
+
+web-test:
+	cd apps/web && npm run typecheck && npm run lint && npm test
+
+web-build:
+	cd apps/web && OPS_API_URL=http://127.0.0.1:1 npm run build
+
 clean:
-	rm -rf dist build *.egg-info .pytest_cache .ruff_cache .mypy_cache
+	rm -rf dist build *.egg-info .pytest_cache .ruff_cache .mypy_cache apps/web/.next apps/web/tsconfig.tsbuildinfo
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

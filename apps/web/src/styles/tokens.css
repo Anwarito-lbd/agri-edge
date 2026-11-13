@@ -1,0 +1,65 @@
+/* agri-edge design tokens v2 (copied verbatim from the design bot's css/tokens.css, mirror of tokens.json).
+   Only change: --ae-font resolves to the next/font Inter variable, with the same fallbacks.
+   The legacy names used by older pages are aliased in globals.css. */
+:root {
+  /* brand */
+  --ae-primary: #006EB0;
+  --ae-primary-dark: #00529C;
+  --ae-navy: #173D68;
+  --ae-night: #1A2A38;
+  --ae-blue-mid: #225FA3;
+  --ae-blue-light: #3879C1;
+  --ae-surface: #EEF2F6;
+  --ae-cyan: #00A6DC;          /* accent: 50x6 H2 bar + logo chevron ONLY */
+  /* the single permitted secondary surface: warm paper neutral (grower sections, human warmth). Never a text or line colour on its own. */
+  --ae-paper: #F5F2EC;
+  --ae-paper-line: #DDD6C8;
+  /* neutrals */
+  --ae-text: #222222;
+  --ae-muted: #5B6B7A;
+  --ae-border: #D5DDE5;
+  --ae-white: #FFFFFF;
+  /* chart ink (non-text strokes only) */
+  --ae-chart-line: #C3CED9;
+  /* status — ops badges only */
+  --ae-ok: #1FAA92;
+  --ae-warn: #F4793B;
+  --ae-critical: #ED1C24;
+  --ae-ok-tint: #E8F7F4;
+  --ae-warn-tint: #FEF0E8;
+  --ae-critical-tint: #FDE8E9;
+  /* simulation banner */
+  --ae-sim-bg: #FFF4E5;
+  --ae-sim-border: #F4793B;
+  --ae-sim-text: #5A2A00;
+  /* type */
+  --ae-font: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --ae-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --ae-display: 600 56px/60px var(--ae-font);   /* tracking -0.02em */
+  --ae-h1: 600 44px/52px var(--ae-font);        /* tracking -0.015em */
+  --ae-h2: 600 36px/44px var(--ae-font);        /* tracking -0.01em */
+  --ae-h3: 500 24px/32px var(--ae-font);
+  --ae-h4: 600 18px/26px var(--ae-font);
+  --ae-body: 400 18px/28px var(--ae-font);
+  --ae-body-sm: 400 16px/24px var(--ae-font);
+  --ae-caption: 400 14px/20px var(--ae-font);
+  --ae-eyebrow: 500 13px/18px var(--ae-font);
+  --ae-eyebrow-tracking: .08em;                  /* ALL CAPS needs >= .06em (open-design craft/typography) */
+  /* spacing (8pt grid, 4pt half-steps) */
+  --ae-space-1: 8px; --ae-space-2: 16px; --ae-space-3: 24px; --ae-space-4: 32px;
+  --ae-space-5: 40px; --ae-space-6: 48px; --ae-space-8: 64px; --ae-space-12: 96px;
+  --ae-section-pad: 96px;
+  --ae-container: 1200px;
+  /* shape */
+  --ae-radius-card: 8px;
+  --ae-radius-ctl: 4px;
+  --ae-radius-pill: 999px;
+  --ae-btn-h: 48px;
+  --ae-border-w: 1px;
+  /* motion (150 ms state feedback, 240 ms enter; strip on reduced-motion) */
+  --ae-dur-fast: 150ms;
+  --ae-dur-base: 240ms;
+  --ae-ease: cubic-bezier(.2, 0, 0, 1);
+  /* focus */
+  --ae-focus: 0 0 0 2px #fff, 0 0 0 4px var(--ae-primary);
+}
