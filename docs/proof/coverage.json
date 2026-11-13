@@ -1,0 +1,240 @@
+{
+  "swath_m": 30.0,
+  "overlap": 0.2,
+  "spacing_m": 24.0,
+  "best_heading_deg": 90.0,
+  "area_ha": 9.12,
+  "lines": 18,
+  "line_distance_m": 3780.0,
+  "turn_distance_m": 408.0,
+  "total_distance_m": 4188.0,
+  "duration_s_at_5ms_plus_4s_turns": 905.6,
+  "turn_penalty_s": 4.0,
+  "turn_penalty_note": "placeholder in CoveragePlan.estimate_duration_s; not measured on an aircraft",
+  "gap_fraction": 0.031232146257855645,
+  "speed_ms": 5.0,
+  "worst_heading": {
+    "heading_deg": 175.0,
+    "total_distance_m": 5314.37190380147,
+    "turn_distance_m": 1527.6877518088704,
+    "lines": 20
+  },
+  "sweep": [
+    {
+      "heading_deg": 0.0,
+      "total_distance_m": 4860.0,
+      "turn_distance_m": 960.0,
+      "lines": 17
+    },
+    {
+      "heading_deg": 5.0,
+      "total_distance_m": 4967.805434822905,
+      "turn_distance_m": 1181.1212828303055,
+      "lines": 20
+    },
+    {
+      "heading_deg": 10.0,
+      "total_distance_m": 5092.341495961762,
+      "turn_distance_m": 1293.4028078382287,
+      "lines": 20
+    },
+    {
+      "heading_deg": 15.0,
+      "total_distance_m": 5037.779969581996,
+      "turn_distance_m": 1215.7600608251923,
+      "lines": 21
+    },
+    {
+      "heading_deg": 20.0,
+      "total_distance_m": 5209.834008865723,
+      "turn_distance_m": 1412.0865349924075,
+      "lines": 23
+    },
+    {
+      "heading_deg": 25.0,
+      "total_distance_m": 5147.40355334729,
+      "turn_distance_m": 1356.6589697269287,
+      "lines": 24
+    },
+    {
+      "heading_deg": 30.0,
+      "total_distance_m": 5124.128430116632,
+      "turn_distance_m": 1321.2565593276524,
+      "lines": 24
+    },
+    {
+      "heading_deg": 35.0,
+      "total_distance_m": 5108.257175615128,
+      "turn_distance_m": 1308.6633448130976,
+      "lines": 25
+    },
+    {
+      "heading_deg": 40.0,
+      "total_distance_m": 5132.5138447386835,
+      "turn_distance_m": 1326.2243410517685,
+      "lines": 25
+    },
+    {
+      "heading_deg": 45.0,
+      "total_distance_m": 5105.203967788782,
+      "turn_distance_m": 1321.7602553909487,
+      "lines": 26
+    },
+    {
+      "heading_deg": 50.0,
+      "total_distance_m": 4850.911714747608,
+      "turn_distance_m": 1052.1120854831584,
+      "lines": 25
+    },
+    {
+      "heading_deg": 55.0,
+      "total_distance_m": 4905.481156360248,
+      "turn_distance_m": 1100.2529982148426,
+      "lines": 25
+    },
+    {
+      "heading_deg": 60.0,
+      "total_distance_m": 4941.823467883958,
+      "turn_distance_m": 1134.5105069243455,
+      "lines": 24
+    },
+    {
+      "heading_deg": 65.0,
+      "total_distance_m": 4928.7667712671955,
+      "turn_distance_m": 1144.400017455935,
+      "lines": 24
+    },
+    {
+      "heading_deg": 70.0,
+      "total_distance_m": 4682.832289212829,
+      "turn_distance_m": 898.1566619707745,
+      "lines": 23
+    },
+    {
+      "heading_deg": 75.0,
+      "total_distance_m": 4758.9447650109205,
+      "turn_distance_m": 954.5038116465169,
+      "lines": 22
+    },
+    {
+      "heading_deg": 80.0,
+      "total_distance_m": 4568.107401555841,
+      "turn_distance_m": 781.7870164241202,
+      "lines": 21
+    },
+    {
+      "heading_deg": 85.0,
+      "total_distance_m": 4720.505623731241,
+      "turn_distance_m": 932.1117964406463,
+      "lines": 19
+    },
+    {
+      "heading_deg": 90.0,
+      "total_distance_m": 4188.0,
+      "turn_distance_m": 408.0,
+      "lines": 18
+    },
+    {
+      "heading_deg": 95.0,
+      "total_distance_m": 4348.352804001616,
+      "turn_distance_m": 559.958976711021,
+      "lines": 19
+    },
+    {
+      "heading_deg": 100.0,
+      "total_distance_m": 4568.107401555841,
+      "turn_distance_m": 781.7870164241207,
+      "lines": 21
+    },
+    {
+      "heading_deg": 105.0,
+      "total_distance_m": 4758.9447650109205,
+      "turn_distance_m": 954.503811646517,
+      "lines": 22
+    },
+    {
+      "heading_deg": 110.0,
+      "total_distance_m": 4782.667732847927,
+      "turn_distance_m": 997.9921056058718,
+      "lines": 23
+    },
+    {
+      "heading_deg": 115.0,
+      "total_distance_m": 4767.871689354782,
+      "turn_distance_m": 983.5049355435204,
+      "lines": 24
+    },
+    {
+      "heading_deg": 120.0,
+      "total_distance_m": 4716.663095996418,
+      "turn_distance_m": 909.350135036806,
+      "lines": 24
+    },
+    {
+      "heading_deg": 125.0,
+      "total_distance_m": 5034.499582628858,
+      "turn_distance_m": 1229.2714244834533,
+      "lines": 25
+    },
+    {
+      "heading_deg": 130.0,
+      "total_distance_m": 4996.375495208504,
+      "turn_distance_m": 1197.5758659440542,
+      "lines": 25
+    },
+    {
+      "heading_deg": 135.0,
+      "total_distance_m": 4961.076729021766,
+      "turn_distance_m": 1177.633016623932,
+      "lines": 26
+    },
+    {
+      "heading_deg": 140.0,
+      "total_distance_m": 5132.513844738685,
+      "turn_distance_m": 1326.2243410517688,
+      "lines": 25
+    },
+    {
+      "heading_deg": 145.0,
+      "total_distance_m": 5050.449136260584,
+      "turn_distance_m": 1250.8553054585527,
+      "lines": 25
+    },
+    {
+      "heading_deg": 150.0,
+      "total_distance_m": 5035.079783448082,
+      "turn_distance_m": 1232.2079126591025,
+      "lines": 24
+    },
+    {
+      "heading_deg": 155.0,
+      "total_distance_m": 5147.403553347291,
+      "turn_distance_m": 1356.658969726929,
+      "lines": 24
+    },
+    {
+      "heading_deg": 160.0,
+      "total_distance_m": 5109.2336761126935,
+      "turn_distance_m": 1311.4862022393777,
+      "lines": 23
+    },
+    {
+      "heading_deg": 165.0,
+      "total_distance_m": 5187.603593626005,
+      "turn_distance_m": 1365.5836848692024,
+      "lines": 21
+    },
+    {
+      "heading_deg": 170.0,
+      "total_distance_m": 5092.34149596176,
+      "turn_distance_m": 1293.402807838228,
+      "lines": 20
+    },
+    {
+      "heading_deg": 175.0,
+      "total_distance_m": 5314.37190380147,
+      "turn_distance_m": 1527.6877518088704,
+      "lines": 20
+    }
+  ]
+}

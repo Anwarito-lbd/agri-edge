@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420" role="img">
+<title>Scripted canola water balance (not weather)</title>
+<rect width="100%" height="100%" fill="#f7f5f0"/>
+<style>text{font-family:Georgia,serif;fill:#1c1915} .small{font-size:12px;fill:#4a453d} .axis{font-size:11px;fill:#4a453d}</style>
+<text x="64" y="26" font-size="16">Scripted canola water balance (not weather)</text>
+<line x1="64.0" y1="372.0" x2="736.0" y2="372.0" stroke="#1c1915"/>
+<line x1="64.0" y1="372.0" x2="64.0" y2="46.0" stroke="#1c1915"/>
+<polyline fill="none" stroke="#1f6b3a" stroke-width="2" points="64.0,294.2 97.6,284.1 131.2,274.0 164.8,263.3 198.4,251.8 232.0,240.3 265.6,230.9 299.2,221.6 332.8,210.8 366.4,200.0 400.0,188.5 433.6,177.0 467.2,167.0 500.8,156.9 534.4,276.2 568.0,265.4 601.6,253.9 635.2,241.0 668.8,230.2 702.4,218.0 736.0,205.0"/>
+<line x1="550" y1="48" x2="568" y2="48" stroke="#1f6b3a" stroke-width="2"/>
+<text class="small" x="574" y="52">root-zone depletion</text>
+<polyline fill="none" stroke="#a33b24" stroke-width="2" points="64.0,258.2 97.6,249.6 131.2,240.3 164.8,229.5 198.4,220.1 232.0,209.4 265.6,200.7 299.2,191.4 332.8,182.8 366.4,173.4 400.0,162.6 433.6,151.1 467.2,144.0 500.8,135.3 534.4,126.0 568.0,115.2 601.6,105.9 635.2,95.1 668.8,86.5 702.4,77.1 736.0,68.5"/>
+<line x1="550" y1="64" x2="568" y2="64" stroke="#a33b24" stroke-width="2"/>
+<text class="small" x="574" y="68">readily available water</text>
+<polyline fill="none" stroke="#3d6f9c" stroke-width="2" points="64.0,349.5 97.6,349.5 131.2,349.5 164.8,349.5 198.4,349.5 232.0,349.5 265.6,349.5 299.2,349.5 332.8,349.5 366.4,349.5 400.0,349.5 433.6,349.5 467.2,349.5 500.8,349.5 534.4,220.1 568.0,349.5 601.6,349.5 635.2,349.5 668.8,349.5 702.4,349.5 736.0,349.5"/>
+<line x1="550" y1="80" x2="568" y2="80" stroke="#3d6f9c" stroke-width="2"/>
+<text class="small" x="574" y="84">rain</text>
+<text class="axis" x="400" y="408">day index</text>
+<text class="axis" x="16" y="209" transform="rotate(-90 16 209)">millimetres</text>
+</svg>

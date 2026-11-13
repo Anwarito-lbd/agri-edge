@@ -1,0 +1,9 @@
+$ /usr/bin/python3 -m agri_edge.cli indices red,green,nir,red-edge
+
+Bands recognised: green, nir, red, red-edge
+
+  [  missing] excess_green  needs green, red, blue  -- lacking blue
+  [available] gndvi         needs nir, green
+  [available] ndre          needs nir, red-edge
+  [available] ndvi          needs nir, red
+  [available] savi          needs nir, red

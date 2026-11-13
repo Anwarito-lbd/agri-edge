@@ -1,0 +1,41 @@
+site: demo-laptop
+field_id: synthetic-straight-line
+capture:
+  resolution:
+  - 320
+  - 240
+  interval_s: 0.25
+  output_dir: ./data/demo-raw
+  max_telemetry_age_s: 2.0
+qa:
+  blur_threshold: 100.0
+  overexposed_fraction: 0.05
+  underexposed_fraction: 0.05
+  saturation_high: 250
+  saturation_low: 5
+  min_fix_type: 3
+  require_rtk_fixed: false
+  max_hdop: 2.0
+  min_satellites: 8
+  required_bands:
+  - red
+  - green
+  - nir
+  - red-edge
+inference:
+  enabled: true
+  backend: simulated
+  model_path: null
+  confidence_threshold: 0.5
+  input_size:
+  - 640
+  - 640
+  class_names: []
+spool:
+  spool_dir: docs/proof/_spool
+  max_bytes: 1073741824
+  upload_endpoint: null
+mavlink:
+  connection: udpin:0.0.0.0:14550
+  source_system: 200
+  heartbeat_timeout_s: 5.0

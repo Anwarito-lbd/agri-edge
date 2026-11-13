@@ -1,0 +1,248 @@
+[
+  {
+    "case": "all_gates_pass",
+    "allowed": true,
+    "reasons": [],
+    "gates": {
+      "operator_armed": true,
+      "payload_armed": true,
+      "confidence": true,
+      "model_validated": true,
+      "position": true,
+      "pose": true,
+      "geofence": true,
+      "actuator": true,
+      "mission_state": true,
+      "command": true
+    },
+    "simulated_actuator_commands": 1,
+    "event_counts": {
+      "detected": 1,
+      "treated": 1,
+      "skipped": 0,
+      "outside_geofence": 0,
+      "skip_reasons": {},
+      "simulated": true
+    },
+    "simulated": true
+  },
+  {
+    "case": "operator_not_armed",
+    "allowed": false,
+    "reasons": [
+      "NOT_OPERATOR_ARMED"
+    ],
+    "gates": {
+      "operator_armed": false,
+      "payload_armed": true,
+      "confidence": true,
+      "model_validated": true,
+      "position": true,
+      "pose": true,
+      "geofence": true,
+      "actuator": true,
+      "mission_state": true,
+      "command": true
+    },
+    "simulated_actuator_commands": 0,
+    "event_counts": {
+      "detected": 1,
+      "treated": 0,
+      "skipped": 1,
+      "outside_geofence": 0,
+      "skip_reasons": {
+        "NOT_OPERATOR_ARMED": 1
+      },
+      "simulated": true
+    },
+    "simulated": true
+  },
+  {
+    "case": "model_not_validated",
+    "allowed": false,
+    "reasons": [
+      "MODEL_NOT_VALIDATED"
+    ],
+    "gates": {
+      "operator_armed": true,
+      "payload_armed": true,
+      "confidence": true,
+      "model_validated": false,
+      "position": true,
+      "pose": true,
+      "geofence": true,
+      "actuator": true,
+      "mission_state": true,
+      "command": true
+    },
+    "simulated_actuator_commands": 0,
+    "event_counts": {
+      "detected": 1,
+      "treated": 0,
+      "skipped": 1,
+      "outside_geofence": 0,
+      "skip_reasons": {
+        "MODEL_NOT_VALIDATED": 1
+      },
+      "simulated": true
+    },
+    "simulated": true
+  },
+  {
+    "case": "low_confidence",
+    "allowed": false,
+    "reasons": [
+      "CONFIDENCE_BELOW_THRESHOLD"
+    ],
+    "gates": {
+      "operator_armed": true,
+      "payload_armed": true,
+      "confidence": false,
+      "model_validated": true,
+      "position": true,
+      "pose": true,
+      "geofence": true,
+      "actuator": true,
+      "mission_state": true,
+      "command": true
+    },
+    "simulated_actuator_commands": 0,
+    "event_counts": {
+      "detected": 1,
+      "treated": 0,
+      "skipped": 1,
+      "outside_geofence": 0,
+      "skip_reasons": {
+        "CONFIDENCE_BELOW_THRESHOLD": 1
+      },
+      "simulated": true
+    },
+    "simulated": true
+  },
+  {
+    "case": "outside_geofence",
+    "allowed": false,
+    "reasons": [
+      "OUTSIDE_TREATMENT_GEOFENCE"
+    ],
+    "gates": {
+      "operator_armed": true,
+      "payload_armed": true,
+      "confidence": true,
+      "model_validated": true,
+      "position": true,
+      "pose": true,
+      "geofence": false,
+      "actuator": true,
+      "mission_state": true,
+      "command": true
+    },
+    "simulated_actuator_commands": 0,
+    "event_counts": {
+      "detected": 1,
+      "treated": 0,
+      "skipped": 1,
+      "outside_geofence": 1,
+      "skip_reasons": {
+        "OUTSIDE_TREATMENT_GEOFENCE": 1
+      },
+      "simulated": true
+    },
+    "simulated": true
+  },
+  {
+    "case": "mission_paused",
+    "allowed": false,
+    "reasons": [
+      "MISSION_STATE_NOT_PERMITTED"
+    ],
+    "gates": {
+      "operator_armed": true,
+      "payload_armed": true,
+      "confidence": true,
+      "model_validated": true,
+      "position": true,
+      "pose": true,
+      "geofence": true,
+      "actuator": true,
+      "mission_state": false,
+      "command": true
+    },
+    "simulated_actuator_commands": 0,
+    "event_counts": {
+      "detected": 1,
+      "treated": 0,
+      "skipped": 1,
+      "outside_geofence": 0,
+      "skip_reasons": {
+        "MISSION_STATE_NOT_PERMITTED": 1
+      },
+      "simulated": true
+    },
+    "simulated": true
+  },
+  {
+    "case": "command_expired",
+    "allowed": false,
+    "reasons": [
+      "COMMAND_EXPIRED"
+    ],
+    "gates": {
+      "operator_armed": true,
+      "payload_armed": true,
+      "confidence": true,
+      "model_validated": true,
+      "position": true,
+      "pose": true,
+      "geofence": true,
+      "actuator": true,
+      "mission_state": true,
+      "command": false
+    },
+    "simulated_actuator_commands": 0,
+    "event_counts": {
+      "detected": 1,
+      "treated": 0,
+      "skipped": 1,
+      "outside_geofence": 0,
+      "skip_reasons": {
+        "COMMAND_EXPIRED": 1
+      },
+      "simulated": true
+    },
+    "simulated": true
+  },
+  {
+    "case": "nan_position",
+    "allowed": false,
+    "reasons": [
+      "POSITION_INVALID",
+      "GEOFENCE_NOT_EVALUATED"
+    ],
+    "gates": {
+      "operator_armed": true,
+      "payload_armed": true,
+      "confidence": true,
+      "model_validated": true,
+      "position": false,
+      "pose": true,
+      "geofence": false,
+      "actuator": true,
+      "mission_state": true,
+      "command": true
+    },
+    "simulated_actuator_commands": 0,
+    "event_counts": {
+      "detected": 1,
+      "treated": 0,
+      "skipped": 1,
+      "outside_geofence": 0,
+      "skip_reasons": {
+        "POSITION_INVALID": 1,
+        "GEOFENCE_NOT_EVALUATED": 1
+      },
+      "simulated": true
+    },
+    "simulated": true
+  }
+]

@@ -1,0 +1,10 @@
+$ /usr/bin/python3 -m agri_edge.cli -c /workspace/docs/proof/demo.resolved.yaml preflight --simulate
+
+  [ok]   spool writable: docs/proof/_spool
+  [ok]   free space: 264.3 GB
+  [ok]   model: simulated v0.0.0
+
+  WARN   model is NOT locally validated -- output is decision support only and must not drive treatment
+
+Edge preflight passed. Review warnings.
+This is not an aviation preflight. See docs/briefs/04-compliance-checklist.md.
