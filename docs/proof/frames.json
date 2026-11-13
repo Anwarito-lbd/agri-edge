@@ -1,0 +1,302 @@
+[
+  {
+    "sequence": 1,
+    "lat": 50.4452,
+    "lon": -104.61889791098062,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.99259543418884,
+    "qa_severity": "ok",
+    "blur": 188.97191660237556,
+    "ndvi_mean": 0.016283092588885023,
+    "ndvi_min": -0.5052631578947369,
+    "ndvi_max": 0.674074074074074,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 2,
+    "lat": 50.4452,
+    "lon": -104.61886262715612,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.86753129959106,
+    "qa_severity": "ok",
+    "blur": 190.13557947029793,
+    "ndvi_mean": 0.016196345932670917,
+    "ndvi_min": -0.49206349206349204,
+    "ndvi_max": 0.6814814814814815,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 3,
+    "lat": 50.4452,
+    "lon": -104.6188273159888,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.74237024784088,
+    "qa_severity": "ok",
+    "blur": 189.24700537793046,
+    "ndvi_mean": 0.016277499337937387,
+    "ndvi_min": -0.49238578680203043,
+    "ndvi_max": 0.6911764705882353,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 4,
+    "lat": 50.4452,
+    "lon": -104.61879203283694,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.6173084974289,
+    "qa_severity": "ok",
+    "blur": 189.7334489181047,
+    "ndvi_mean": 0.016214360604357467,
+    "ndvi_min": -0.5,
+    "ndvi_max": 0.6703296703296703,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 5,
+    "lat": 50.4452,
+    "lon": -104.61875675314919,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.49225902557373,
+    "qa_severity": "ok",
+    "blur": 188.90495523593833,
+    "ndvi_mean": 0.016258059378213282,
+    "ndvi_min": -0.48223350253807107,
+    "ndvi_max": 0.6974169741697417,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 6,
+    "lat": 50.4452,
+    "lon": -104.61872147275515,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.36720705032349,
+    "qa_severity": "ok",
+    "blur": 189.440039272283,
+    "ndvi_mean": 0.01626939075327411,
+    "ndvi_min": -0.4973821989528796,
+    "ndvi_max": 0.6764705882352942,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 7,
+    "lat": 50.4452,
+    "lon": -104.61868619175574,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.24215292930603,
+    "qa_severity": "ok",
+    "blur": 189.85921231419385,
+    "ndvi_mean": 0.016276606994403475,
+    "ndvi_min": -0.4948453608247423,
+    "ndvi_max": 0.6776556776556777,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 8,
+    "lat": 50.4452,
+    "lon": -104.61865091206799,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 99.11710345745087,
+    "qa_severity": "ok",
+    "blur": 190.067236383035,
+    "ndvi_mean": 0.016293294235966198,
+    "ndvi_min": -0.48484848484848486,
+    "ndvi_max": 0.6834532374100719,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 9,
+    "lat": 50.4452,
+    "lon": -104.61861563100132,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 98.99204909801483,
+    "qa_severity": "ok",
+    "blur": 188.6102717737838,
+    "ndvi_mean": 0.016230086362063117,
+    "ndvi_min": -0.5212765957446809,
+    "ndvi_max": 0.674074074074074,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 10,
+    "lat": 50.4452,
+    "lon": -104.61858033540561,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 98.86694324016571,
+    "qa_severity": "ok",
+    "blur": 189.99217951177866,
+    "ndvi_mean": 0.016261037058470967,
+    "ndvi_min": -0.4895833333333333,
+    "ndvi_max": 0.6853932584269663,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 11,
+    "lat": 50.4452,
+    "lon": -104.61854505497796,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 98.74189114570618,
+    "qa_severity": "ok",
+    "blur": 189.73851491733907,
+    "ndvi_mean": 0.016254671586807,
+    "ndvi_min": -0.5025906735751295,
+    "ndvi_max": 0.6802973977695167,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  },
+  {
+    "sequence": 12,
+    "lat": 50.4452,
+    "lon": -104.6185097693037,
+    "alt_rel_m": 100.0,
+    "groundspeed_ms": 10.0,
+    "fix_name": "rtk-fixed",
+    "battery_pct": 98.61682045459747,
+    "qa_severity": "ok",
+    "blur": 190.36085760791616,
+    "ndvi_mean": 0.01625957962830612,
+    "ndvi_min": -0.49732620320855614,
+    "ndvi_max": 0.6703296703296703,
+    "ndvi_calibrated": false,
+    "detections": [
+      {
+        "label": "vegetation",
+        "confidence": 1.0,
+        "validated_locally": false,
+        "may_drive_treatment": false
+      }
+    ],
+    "decision_support_only": true,
+    "environment_c": 24.0
+  }
+]

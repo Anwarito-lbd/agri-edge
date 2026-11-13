@@ -1,397 +1,242 @@
 # agri-edge
 
-Companion-computer edge pipeline for agricultural RPAS operations in Canada.
+Agri-Edge is the companion-computer brain for agricultural drone scouting.
+A Raspberry Pi rides along with an autopilot, keeps the pictures, checks
+whether they are usable, and refuses to turn a model score into a spray
+command. The autopilot keeps the aircraft in the air. This process does not.
 
-Runs on a Raspberry Pi 5 alongside a Pixhawk/Cube autopilot: captures geotagged
-imagery, assesses its quality at the point of capture, runs optional edge
-inference, computes vegetation indices, and spools everything for
-store-and-forward transfer. Runs fully simulated on a laptop with no hardware.
+The problem it is aimed at is a practical one. A weed map is only useful if
+the camera could actually see the weed, the frame still has a position, and
+nobody has wired a false positive to a pump. Most of the work in this
+repository is those gates, plus the ground-side agronomy that would consume
+the pictures later: vegetation indices, a treatment geofence, water balance,
+and an operations API. It runs on a laptop with no aircraft attached. Nothing
+in the run below is a field measurement.
+
+The farmer-facing site is a separate repository, [agri-edge-web](https://github.com/Anwarito-lbd/agri-edge-web), deployed at [agri-edge-web.vercel.app](https://agri-edge-web.vercel.app). On 13 November 2026 that URL answered HTTP 200 with the title “agri-edge — Aerial crop scouting software prototype”. The GitHub repository is private; this environment could not read its tree. This repo does not contain the website, and it should not.
+
+## What a laptop run actually produced
+
+`python scripts/portfolio_demo.py` wrote `docs/proof/` on 13 November 2026 at 02:11:22 UTC. `summary.json` records `source_commit` `12b4267`, which was HEAD at generation time; the runner itself is part of this change. ArduPilot SITL was not started: `vendor/ardupilot` is not in the tree, and `summary.json` records `sitl_ran: false`.
+
+### 1. Plan the passes, then play them back
+
+`geo/coverage.py` turns a field polygon into parallel passes. Spacing is the swath times one minus the overlap, not the raw camera footprint. A line that lands exactly on an edge disappears under the half-open crossing rule, so the planner centres the set and insets it. Concave ground, a slough or a notch, splits one pass into two runs so the aircraft does not record the gap as covered.
+
+The demo field is a synthetic polygon in local metres, 9.12 ha, with a rectangular notch. Swath 30 m, overlap 0.2, so the lines are 24 m apart. `best_heading` searches every 5° and keeps the heading with the least total distance, including the connectors between lines.
+
+| | Observed |
+|---|---:|
+| Best heading | 90° counter-clockwise from east |
+| Lines | 18 |
+| Distance on lines | 3,780 m |
+| Distance in turns | 408 m |
+| Total | 4,188 m |
+| Worst heading in the same sweep (175°) | 5,314 m |
+| Time at 5 m/s plus the planner’s 4 s turn placeholder | 905.6 s |
+| Field farther than half a swath from any line | 3.12% |
+
+The 4 s turn cost is the comment in `CoveragePlan.estimate_duration_s`: a placeholder, not a stopwatch on an airframe. The 3.12% gap is `coverage_gaps` sampling the polygon on an 80×80 grid. It is an independent check, and on this notched field it does not come out at zero.
+
+![Coverage playback](docs/proof/flight_track.svg)
+
+Green segments are the photo passes. Dashed segments are the turns, which collect nothing. The dots are the kinematic playback written to `docs/proof/telemetry.csv`: constant 5 m/s, no wind, no attitude, one sample every 0.5 s. That is a drawing of the plan, not a flight dynamics model.
+
+![Heading sweep](docs/proof/heading_sweep.svg)
+
+### 2. Fly the capture pipeline in simulation
+
+The second run is the real command:
 
 ```bash
-pip install -e ".[dev]"
-python -m pytest                                    # 347 tests, no hardware needed
-agri-edge -c config/example.yaml preflight --simulate
-agri-edge -c config/example.yaml fly --simulate --frames 20
+python -m agri_edge.cli -c config/demo.yaml fly --simulate --frames 12 \
+  --bands red,green,blue,nir,red-edge
 ```
 
-Two halves, deliberately separated:
+`config/demo.yaml` asks for 320×240 frames at 0.25 s so a laptop spool stays small. The QA blur threshold is the same 100 used in `config/example.yaml`. `--simulate` builds `SimulatedTelemetry` and `SimulatedCamera`. Telemetry flies due east at 10 m/s from 50.4452 N, 104.6189 W, the default in that class, at 100 m above the home point, reporting an RTK-fixed fix. The camera paints crop rows, a vigour gradient, and a stressed ellipse. The detector is `SimulatedEngine`: excess-green blobbing, explicitly not a weed model, `validated_locally` false.
 
-| | `src/agri_edge/` | `training/` |
+From `docs/proof/cli_fly.log` and `docs/proof/summary.json`:
+
+| | Observed |
+|---|---|
+| Frames captured / QA pass / spool | 12 / 12 / 12 |
+| Laplacian blur | 188.6 to 190.4, all above the threshold of 100 |
+| Eastward travel | 27.52 m (wall-clock time × 10 m/s) |
+| Detections | 12, each one full-frame box labelled `vegetation` at confidence 1.0 |
+| `validated_locally` | false on every detection |
+| `may_drive_treatment` | false on every detection |
+| `decision_support_only` | true on every sidecar |
+| Spool priority | ANOMALY on all 12, because a detection was present |
+| Spool size | 18,482,002 bytes, then the arrays were deleted |
+| Inference errors | 0 |
+
+Preflight on the same config passed, and warned that the model is not locally validated. The straight-line track is short because the simulator integrates real elapsed time and twelve frames do not take long.
+
+The first spooled frame, scaled 2× with nearest-neighbour so it is readable:
+
+![Synthetic scene](docs/proof/scene_rgb.png)
+
+![NDVI of that frame](docs/proof/ndvi.png)
+
+NDVI is `(NIR − Red) / (NIR + Red)`, from `geo/indices.py`. On that frame it was uncalibrated digital numbers, valid on every pixel, minimum −0.505, median 0.022, mean 0.0163, maximum 0.674. The yellow patch is the stressed ellipse the camera drew. `calibrated` is false, so this must not be compared with another date. The mean sits near zero because healthy rows and the stressed patch cancel; the picture is the result, not the mean.
+
+`agri-edge indices` shows the same rule for a missing band. Red, green, NIR and red-edge produce NDVI, NDRE, GNDVI and SAVI, and refuse excess-green because blue is absent (`docs/proof/cli_indices.log`). Adding blue makes excess-green available (`docs/proof/cli_indices_with_blue.log`).
+
+### 3. The treatment gate, still simulated
+
+`decision/engine.py` will record a command on `SimulatedActuator` only when every gate passes. There is no pump behind it, and the engine refuses an actuator whose `simulated` attribute is not exactly `True`. The eight cases in `docs/proof/decisions.json` use the same local frame as `tests/test_decision_engine.py` (origin 49.8951 N, 97.1384 W, a 200 m square, 10 m buffer). One case was allowed and wrote one simulated command. The other seven wrote none.
+
+| Case | Allowed | Reason |
 |---|---|---|
-| Runs on | the Pi, in flight | your laptop |
-| Dependencies | numpy, PyYAML (+ onnx/camera extras) | torch, YOLOX, pycocotools |
-| Ships to the aircraft | yes | **never** |
+| Every gate satisfied | yes | |
+| Operator not armed | no | `NOT_OPERATOR_ARMED` |
+| Model not locally validated | no | `MODEL_NOT_VALIDATED` |
+| Confidence 0.40, threshold 0.85 | no | `CONFIDENCE_BELOW_THRESHOLD` |
+| Point 180 m east of the field | no | `OUTSIDE_TREATMENT_GEOFENCE` |
+| Mission paused | no | `MISSION_STATE_NOT_PERMITTED` |
+| Command already expired | no | `COMMAND_EXPIRED` |
+| Latitude is NaN | no | `POSITION_INVALID`, `GEOFENCE_NOT_EVALUATED` |
 
-Torch is ~3 GB and YOLOX pulls a large dependency tree. Neither belongs on an
-aircraft, so the split is **enforced by test**: `tests/test_runtime_deps.py`
-asserts that nothing under `src/agri_edge/` imports torch, onnxruntime, OpenCV,
-picamera2, rasterio, HailoRT or pymavlink at module level, then imports the whole
-package in a subprocess with those blocked and runs the pipeline end to end.
-Optional extras are imported lazily, inside the functions that need them.
+The capture run and this gate are separate on purpose. The capture detector is not validated, so the flight sidecars stay decision-support. The one allowed decision above is a hand-built input used to show the gate opening, and the actuator list is the only place that command went.
 
----
+### 4. Optics, and a published ET0 check
 
-## Why it is built this way
+Ground sample distance, pinhole model, in `training/gsd_calculator.py`:
 
-Three design rules carry most of the weight. Each is enforced in code, not just
-documented.
+```
+ground width (m) = (sensor width mm / focal length mm) × altitude
+native GSD (cm/px) = ground width × 100 / image width
+```
 
-### 1. The Pi cannot command the aircraft
-
-The autopilot owns attitude stabilisation, navigation and failsafes. The Pi owns
-perception and data management. `telemetry/mavlink_link.py` is read-only by
-construction — it has no method that could arm, disarm, change mode, upload a
-mission or trigger a failsafe, and a test asserts that none appears.
-
-The aircraft must fly its geofence, lost-link, battery and return-to-home logic
-correctly with this process dead. A companion computer that can command the
-vehicle puts that guarantee at the mercy of a Linux userspace process.
-
-### 2. A model is a sensor, not a decision
-
-Every `Detection` carries `validated_locally`, and `may_drive_treatment` is False
-whenever it is False. Every frame's sidecar records `decision_support_only`.
-
-A weed model trained on DeepWeeds learned Australian species in Australian
-conditions; PlantVillage is single leaves on plain backgrounds and is not aerial
-field imagery at all. Neither is evidence of performance on Saskatchewan canola.
-A false positive used for scouting costs a walk across a field; the same false
-positive wired to a sprayer costs chemical, crop, or an environmental incident.
-So the flag travels with the detection all the way to whatever would act on it.
-
-Set `validated_locally: true` in a model's `.meta.json` only after validating
-against local field observations, recorded by crop, growth stage, location,
-season, altitude and lighting.
-
-### 3. Failed QA flags data, it does not delete it
-
-A frame that fails quality assessment is spooled at `DEGRADED` priority, not
-discarded. A blurred frame over a genuine anomaly is still evidence that
-something is there, and the decision to throw data away belongs to an agronomist
-on the ground with context — not to a threshold on a Pi at 100 m AGL.
-
-The disk-quota policy follows the same logic: it evicts uploaded payloads first,
-then QA-failed frames oldest-first, and never evicts an anomaly frame.
-
----
-
-## What runs where
-
-Deliberately split, because the wrong split is the most common way these systems
-fail:
-
-| Stage | Runs on | Why |
-|---|---|---|
-| Flight control, failsafes | **Pixhawk / Cube** | Must survive any failure of everything else |
-| Capture, QA, detection, indices, spooling | **Raspberry Pi 5** (+ AI HAT+) | Low latency, works offline, reduces what must be transferred |
-| Orthomosaics, dense point clouds, DSM/DTM, full multispectral mosaics | **Field workstation** | 32–64 GB RAM and a real GPU; never on an airborne Pi |
-| Multi-year archives, cross-farm training, dashboards | **Cloud** | Scale and collaboration |
-
-**Edge first for flight-time decisions, workstation first for photogrammetry,
-cloud for scale.**
-
-On accelerator choice: the **26-TOPS AI HAT+** is the right buy for this
-workload. The 40-TOPS AI HAT+ 2 (Hailo-10H, 8 GB) delivers roughly comparable
-computer-vision throughput — its advantage is local LLM and VLM inference, which
-this pipeline does not do.
-
----
-
-## Read this before planning a flight altitude
-
-Detecting weeds from a surveying drone is limited by **optics, not by the model**.
-Two numbers differ and only one is usually considered:
-
-- **native GSD** — cm per pixel on the sensor.
-- **effective GSD** — cm per pixel *as the model sees it*. Letterboxing a
-  4056-wide frame down to the 640×640 network input discards **6.3× of linear
-  resolution** before inference happens.
-
-For a Pi Camera Module 3, needing ~20 px across the target:
+For the IMX708 (6.45 mm sensor, 4.74 mm lens, 4608 px) letterboxed to 640 px, the downscale is 7.2×. A target needs 20 px across it. From `docs/proof/gsd_3cm.log` and `gsd_30cm.log`:
 
 | Target | Whole-frame ceiling | Tiled ceiling |
 |---|---:|---:|
-| 3 cm weed seedling | **0.6 m AGL** | **3.9 m AGL** |
-| 30 cm mature weed | 6.1 m | **39 m** |
-| 120 cm sheep | 24.6 m | 155 m |
-| 200 cm cow | **41 m** | 260 m |
+| 3 cm seedling | 0.7 m AGL | 5.1 m AGL |
+| 30 cm plant | 7.1 m AGL | 50.8 m AGL |
 
-At a normal 30 m survey altitude a 3 cm seedling is **2.6 px** even at native
-resolution, and 0.4 px after downscaling. No model recovers that. Run
-`python training/gsd_calculator.py --target-size 3` for your own camera and target.
+At 30 m a 3 cm seedling is 0.5 px whole-frame and 3.4 px tiled. It is not in the picture in any useful sense. A 30 cm target at the same altitude is 33.9 px tiled, native GSD 0.886 cm/px.
 
-**Tiling is the fix**, and it is not an optimisation. It slices the frame into
-native-resolution tiles instead of downscaling, buying back the full 6.3×:
+![Pixels across the target versus altitude](docs/proof/gsd.svg)
 
-```yaml
-inference:
-  tiled: true
-  tile_size: 640
-  tile_overlap: 0.2
+Motion blur holds the smear to one native pixel, so exposure must be `gsd / speed`. At 30 m and 5 m/s that is 1.77 ms (`docs/proof/motion_budget.log`). Rolling-shutter skew uses a 33 ms full-frame readout that the script tells you to measure rather than trust. Under that assumption the frame stays inside 5 px of skew only up to 1.3 m/s. Across one 30 cm target the readout is 0.43 ms, and at 5 m/s the target itself moves 0.24 px, so the skew is a mapping problem more than a detection problem.
+
+FAO-56 Example 18, Brussels on 6 July, is the published check of `et0_penman_monteith`. The function returned 3.880 mm/day against the paper’s 3.9 mm/day. The water-balance chart is not weather. It is 21 days of temperatures written in `scripts/portfolio_demo.py`, canola on loam, seeded 20 May 2026. Depletion was 26.8 mm on 14 June and 10.2 mm on 15 June after the scripted 18 mm of rain. The stress coefficient stayed 1.0 the whole way, because root growth kept readily available water ahead of depletion. Final day, 21 June: depletion 20.1 mm, readily available water 39.1 mm.
+
+![Scripted water balance](docs/proof/water_balance.svg)
+
+### Tests
+
+`python -m pytest -q` on the same day: **1900 passed, 30 skipped, 37.60 s** (`docs/proof/pytest.log`). The skips are the tests that need a live broker, PostGIS, or hardware. `tests/test_portfolio_demo.py` re-runs the demo for three frames so the artifact writer cannot rot quietly.
+
+## Architecture
+
+```mermaid
+flowchart TB
+  subgraph air [Aircraft]
+    CAM[Camera]
+    PI["Raspberry Pi 5: capture, QA, indices, spool"]
+    FC["Autopilot: attitude, navigation, failsafes"]
+    CAM --> PI
+    FC -->|MAVLink, read only| PI
+  end
+
+  subgraph gate [Payload, simulation only]
+    DET["Detection, validated_locally false by default"]
+    ENG["TreatmentDecisionEngine: ten gates, fails closed"]
+    ACT["SimulatedActuator: appends to a list"]
+    DET --> ENG --> ACT
+  end
+
+  PI --> DET
+  PI -->|store and forward| OPS
+
+  subgraph ground [Ground, separate from the aircraft]
+    MQTT[Mosquitto]
+    OPS["agri-edge ops API: SQLite, optional PostGIS"]
+    WEB["agri-edge-web, separate repo"]
+    MQTT --> OPS
+    WEB -->|HTTP| OPS
+  end
 ```
 
-Measured on a 1280×1280 mosaic of real test imagery: whole-frame found 29
-detections, tiled found 66 — **2.3× more**, matching the 61 found by inferring
-each source image natively. It costs one inference per tile, so measure the frame
-rate with `training/benchmark.py` before committing to it.
+The Pi never gets a method that arms the aircraft, changes mode, or uploads a mission. `telemetry/mavlink_link.py` is read-only. Mission commands, later, would have to go through `vehicle/adapter.py` and the safety supervisor, and they fail closed today. Irrigation is a ground MQTT topic. It is not bridged to MAVLink.
 
-The practical consequence, and the product decision taken on 14 Sept 2026:
-**seedlings are out** — capped at 3.9 m even tiled, which is a nervous hover
-rather than a survey. The target is **mature weeds at 39 m**, which makes the
-AI HAT+ a requirement rather than an upgrade (48 tiles per frame is ~7.3 s on the
-Pi's CPU but ~288 ms on the NPU). **Livestock is the exception**: a cow is
-detectable at 41 m whole-frame, so that model runs usefully on a bare Pi.
+| Module | Role |
+|---|---|
+| `pipeline/runner.py` | One frame: telemetry freshness, capture, QA, inference, index summaries, spool |
+| `capture/camera.py` | Picamera2, or the synthetic multispectral scene |
+| `telemetry/mavlink_link.py` | Read-only MAVLink, or the straight-line simulator |
+| `qa/checks.py` | Blur, exposure, GNSS, bands, attitude. A failure is spooled, not deleted |
+| `geo/indices.py` | NDVI, NDRE, GNDVI, SAVI, excess green. Arithmetic, not a prescription |
+| `geo/georeference.py`, `geo/georef.py` | Pixel ray to a flat ground plane, plus a pose gate and an uncertainty budget |
+| `geo/coverage.py` | Boustrophedon passes and the gap check |
+| `geo/geofence.py` | Flight boundary, and a smaller boundary where treatment is even eligible |
+| `inference/` | YOLOX decode in numpy, ONNX and Hailo backends, green-on-brown, tiling |
+| `decision/engine.py` | The ten treatment gates. Simulation only |
+| `agronomy/` | FAO-56 ET0, water balance, growth stage, disease and frost risk |
+| `ops/` | Operations API, alerts, MQTT ingest, prescriptions |
+| `vehicle/` | Adapter and safety supervisor. Commands fail closed |
+| `training/` | Laptop only. Torch and YOLOX never ship on the aircraft |
+| `ground_iot/` | Mosquitto and Node-RED compose. Not vendored into `src/` |
 
-### …and then the aircraft becomes the limit
+A longer note on the capture loop, the datasets, and why the model is YOLOX rather than an AGPL detector is in [docs/EDGE_PIPELINE.md](docs/EDGE_PIPELINE.md). Capability rows, including what has never seen hardware, are in [docs/status.md](docs/status.md). The build order is [docs/MASTER_IMPLEMENTATION_SPEC.md](docs/MASTER_IMPLEMENTATION_SPEC.md).
 
-Tiling buys back the resolution, but it also removes a cushion: whole-frame
-inference downscales 6.3×, which quietly absorbs motion blur. Tiling shows the
-detector the blur at full scale too, so **the motion-blur budget is 6.3× tighter
-and it is now a mechanical problem.** At 30 m holding smear under one pixel:
-3.9 ms exposure at 3 m/s, 2.3 ms at 5 m/s, 1.4 ms at 8 m/s.
+## How the maths fits together
 
-Rolling shutter is a *separate* effect and worth being precise about: a 30 cm
-weed spans ~26 of 3040 rows, so its own readout is 0.28 ms and it is distorted by
-0.12 px at 5 m/s — **detection is unaffected**. What skews is frame-level
-geometry, so georeferencing, area measurement and photogrammetry degrade while
-the image still looks perfectly sharp. Scouting can fly at 5–8 m/s (67–108 ha/h);
-mapping-grade geometry caps near 1.7 m/s (23 ha/h, ~3× the airtime per field).
+**Where to fly.** Rotate the polygon so the passes are horizontal, clip each horizontal line against the boundary, rotate back, and alternate direction. Effective spacing is `swath × (1 − overlap)`. `coverage_gaps` then samples the field and measures distance to the nearest segment, so a spacing bug shows up as unseen ground.
+
+**Where a pixel is.** A pixel is a ray in the camera frame. Aircraft attitude rotates it. It is intersected with a horizontal plane one AGL altitude below the vehicle. At 30 m, 10° of tilt moves the frame centre about 5.3 m, which is why a flat “GSD times pixel offset” is not used. The uncertainty attached to that point is the root-sum-square of terrain, GNSS, heading, attitude and half a pixel. The module says the terrain term defaults to 2 m and has not been checked on a real field.
+
+**Whether anything may be applied.** Ten gates, all required: operator arm, payload arm, confidence, local validation, a finite position, a fresh level pose, the treatment geofence recomputed here rather than trusted from the detection, a healthy simulated actuator, mission state `TREATMENT_ACTIVE`, and a single unexpired human command. A missing input is a refusal.
+
+**What the index means.** NDVI on raw digital numbers describes that frame. It does not describe the crop across a season. The pipeline stores `calibrated: false` for that reason.
+
+## Tools actually declared in this repo
+
+From `pyproject.toml`. The core install is what the Pi is supposed to carry.
+
+| | Packages |
+|---|---|
+| Runtime | `numpy>=1.24`, `pyyaml>=6.0` |
+| Extra `mavlink` | `pymavlink>=2.4` |
+| Extra `camera` | `picamera2>=0.3` |
+| Extra `cv` | `opencv-python-headless>=4.9` |
+| Extra `geo` | `rasterio>=1.3` |
+| Extra `onnx` | `onnxruntime>=1.17` |
+| Extra `sensors` | `adafruit-circuitpython-bme280>=2.6` |
+| Extra `mqtt` | `paho-mqtt>=2.0` |
+| Extra `dev` | `pytest>=8.0` |
+
+`Makefile` also calls `ruff` and `mypy`. They are installed by `make bootstrap`, not imported by the aircraft.
+
+There is no `package.json` and no Dockerfile in this repository. Ground services are `ground_iot/docker-compose.yml`: `eclipse-mosquitto:2` and `nodered/node-red:4.0`. A second compose file sketches PostGIS; `docs/status.md` records that it has not been started.
+
+Training experiments import YOLOX (`training/exps/`). PyTorch is not a core dependency and is not listed in `pyproject.toml`. Model cards under `models/` record earlier held-out numbers. Those weights are not in git (`models/*.onnx` is ignored), and this portfolio run did not re-evaluate them.
+
+Third-party boundaries are listed in `third_party/manifest.yaml`: YOLOX (Apache-2.0), ONNX Runtime, Hailo, ArduPilot (GPL-3.0, process boundary only), pymavlink, OpenWeedLocator, farmOS, WebODM. None of those trees are vendored into `src/`.
+
+## Run it locally
+
+Python 3.10 or newer. The suite here ran on 3.12.
 
 ```bash
-python training/motion_budget.py --altitude 30 --target-size 30
+python -m pip install -e ".[dev]"
+python scripts/portfolio_demo.py          # writes docs/proof/
+python -m pytest -q                       # 1900 passed, 30 skipped on 13 Nov 2026
+python -m agri_edge.cli -c config/example.yaml preflight --simulate
+python -m agri_edge.cli -c config/example.yaml fly --simulate --frames 20
+python -m agri_edge.cli indices red,green,nir,red-edge
+python training/gsd_calculator.py --camera imx708 --target-size 3
+python training/motion_budget.py --camera imx708 --altitude 30 --target-size 30
 ```
 
-## Training the detector
+`config/example.yaml` uses the full Camera Module 3 resolution. Twenty frames at that size are a large spool. `config/demo.yaml` is the small one the proof was generated from.
 
-The model is **YOLOX-s (Apache-2.0)**, not YOLOv8/v11 (AGPL-3.0) or YOLOv6
-(GPL-3.0). This is a product: AGPL would oblige you to open-source it. YOLOX is
-also already in the Hailo model zoo as `yolox_s_leaky`, so there is a documented
-path from checkpoint to `.hef`. See [NOTICE.md](NOTICE.md).
+ArduPilot SITL is `bash scripts/sitl.sh`, and it needs a local ArduPilot build. That binary was not present for the run above. Hailo compilation is `scripts/hailo_compile.sh`, x86_64 Linux only, and it stops without the Dataflow Compiler. The Pi provisioning script is `scripts/pi_setup.sh`, and it is meant to be run on the Pi.
 
-```bash
-python training/download_data.py        # fetch + verify + report class balance
-python training/yolo_to_coco.py         # YOLO txt -> COCO json (YOLOX's format)
-python training/verify_coco.py          # re-check every box against its source
+`python -m agri_edge.ops.api` serves the operations station on `http://127.0.0.1:8765/ops/`. It comes up on seeded demo data.
 
-python vendor/YOLOX/tools/train.py -f training/exps/weed_crop_yolox_s.py \
-    -d 1 -b 8 --fp16 -c weights/yolox_s.pth
+## What this is not
 
-python training/export_onnx.py --ckpt YOLOX_outputs/weed_crop_yolox_s/best_ckpt.pth
-python training/evaluate.py --model models/weed_crop_yolox_s.onnx --split test
-python training/predict_image.py --model models/weed_crop_yolox_s.onnx \
-    --images data/weed-crop-aerial/test/images
-```
-
-### The three models, and what each is actually good for
-
-| Model | Task | Measured on held-out test | Verdict |
-|---|---|---|---|
-| `weed_crop_yolox_s` | weed vs crop, **seedling scale** | weed AP@.50 **0.749**, crop 0.630 | pipeline proof only — see below |
-| `imageweeds_yolox_s` | 5 prairie weed **species** | species AP@.50 0.246 · **binary `weed` 0.520** | **ship it collapsed to binary** |
-| `aerial_sheep_yolox_s` | livestock counting | in training | the one that runs on a bare Pi |
-
-**Three dataset problems were caught by looking at the imagery, not the metrics.**
-Every one of them would have produced a confident, wrong product:
-
-1. `LibreYOLO/weed-crop-aerial` **is not aerial.** "Aerial" is a Roboflow-100
-   *category* label. The images are ground-level close-ups plus **indoor
-   propagation trays**, and 98.3% of its `crop` labels come from the trays. Model
-   1 is a seedling detector; never quote its `crop` number as field performance.
-   It is also 95% weed / 5% crop, so aggregate mAP flatters it — `evaluate.py`
-   reports per-class AP and says so out loud.
-2. `ImageWeeds` labels only the **transplanted potted specimens**. Dozens of
-   natural weeds per frame are unlabelled and train as background, so recall is
-   capped by the annotation and measured precision *understates* reality.
-3. The sheep set is 3× machine-augmented. Had copies of one photo landed on both
-   sides of a split every number would be inflated — checked, and no source photo
-   appears in two splits.
-
-### When a model localises well but classifies badly
-
-`imageweeds_yolox_s` puts **76.2% of its predictions into one of its five
-species** (horseweed, which is 14% of ground truth). The species head collapsed.
-The *boxes*, however, are right — scoring the same model as a single-class
-detector roughly doubles it:
-
-| Mode | AP@.50:.95 | AP@.50 |
-|---|---:|---:|
-| 5-class species | 0.132 | 0.246 |
-| **binary `weed`** | **0.247** | **0.520** |
-
-So the runtime can report a coarser label than the model predicted, while keeping
-the prediction as `source_label` in every sidecar — collapsing changes what is
-*claimed*, never what was *observed*:
-
-```yaml
-inference:
-  class_names: [ragweed, waterhemp, horseweed, redrootpigweed, kochia]
-  collapse_labels_to: weed
-```
-
-```bash
-python training/evaluate.py --model models/imageweeds_yolox_s.onnx     --root data/imageweeds --split test --collapse-to weed
-```
-
-Species ID is still the right goal — species is what picks the chemical — but it
-needs locally annotated imagery, not tuning.
-
-### Training on a machine that fails
-
-Long runs on this laptop drop transient cuDNN faults, and YOLOX prints
-`Training of experiment is done` from a `finally` block **even when it crashed**.
-Always launch through the wrapper, which resumes from `latest_ckpt.pth` on
-transient faults only and judges completion by the last logged epoch:
-
-```bash
-python training/train_resilient.py --exp imageweeds_yolox_s --batch 8
-```
-
-`evaluate.py` and `predict_image.py` both run inference through
-`agri_edge.inference.engine.OnnxEngine` — the exact class the Pi runs — so the
-reported numbers describe the deployed path, letterbox and host-side decode
-included, rather than a torch-side path that never flies.
-
-## Layout
-
-```
-src/agri_edge/              THE PI RUNTIME -- numpy + PyYAML core
-  config.py                 All thresholds in one place, with unknown-key rejection
-  telemetry/mavlink_link.py Read-only MAVLink + simulated telemetry
-  capture/camera.py         Picamera2 backend + synthetic multispectral scene
-  qa/checks.py              Blur, exposure, GNSS, band completeness, attitude
-  geo/indices.py            NDVI, NDRE, GNDVI, SAVI, ExG; management zones
-  inference/yolox.py        Letterbox, grid decode, class-wise NMS (pure numpy)
-  inference/tiling.py       Native-resolution tiled inference (see altitude section)
-  inference/engine.py       ONNX / Hailo / simulated, local-validation + label collapsing
-  sensors/environment.py    BME280 -> temp/RH/pressure, dew point, VPD, spray advisory
-  store/spool.py            Priority store-and-forward queue with quota policy
-  store/uploader.py         Metadata-first, priority-ordered uplink (stdlib only)
-  pipeline/runner.py        The capture -> QA -> inference -> spool loop
-  cli.py                    fly | spool | indices | preflight
-
-training/                   LAPTOP ONLY -- never shipped to the aircraft
-  download_data.py          Fetch from HF, verify counts, report class balance
-  yolo_to_coco.py           Format conversion (the highest-risk step; unit-tested)
-  verify_coco.py            Independent re-check of every converted box
-  prepare_imageweeds.py     Species dataset: fetch, split by source image, verify
-  prepare_aerial_sheep.py   Livestock dataset, incl. the split-leakage check
-  exps/*.py                 One YOLOX experiment per model (three of them)
-  train_resilient.py        Training that survives this GPU's transient faults
-  export_onnx.py            Checkpoint -> ONNX + provenance sidecar
-  evaluate.py               Per-class COCO mAP through the deployed engine
-  predict_image.py          Annotated predictions through the deployed engine
-  benchmark.py              Latency -> capture interval and ground-speed limits
-  gsd_calculator.py         Can the camera resolve the target at altitude X?
-  motion_budget.py          How fast can it fly before blur/skew ruins the frame?
-  finalize.py               Export + evaluate + predict + benchmark, in one step
-
-scripts/pi_setup.sh         Pi 5 provisioning (run on the Pi)
-scripts/hailo_compile.sh    ONNX -> .hef (run in WSL2 Ubuntu; x86_64 only)
-config/example.yaml         Bench/simulation configuration
-config/pi.yaml              Pi + camera + inference configuration
-HANDOFF.md                  START HERE if you are picking this up cold
-docs/BUILD_NOTES.md         Findings, problems hit, and what to do next
-docs/USE_CASES.md           Roadmap: what is free, what is weeks, what is a company
-docs/source/                The original research report
-docs/briefs/                Critique, one-pager, procurement memo, compliance checklist
-tests/                      347 tests, all hardware-free
-```
-
-## Commands
-
-```bash
-# Which indices can a given payload actually produce, and why not the others
-agri-edge indices red,green,blue
-agri-edge indices red,green,nir,red-edge
-
-# Edge-system preflight: config, storage, telemetry, model provenance
-agri-edge -c config/example.yaml preflight
-
-# Capture run
-agri-edge -c config/example.yaml fly --duration 600
-
-# Inspect or offload the spool
-agri-edge -c config/example.yaml spool --list 20
-agri-edge -c config/example.yaml spool --export /media/ssd/flight-2026-09-13
-```
-
-`preflight` checks only what software can check. It is **not** an aviation
-preflight — airspace, NOTAMs, certification, weather and pesticide label
-conditions are all outside what a Python process can verify. See
-[the compliance checklist](docs/briefs/04-compliance-checklist.md).
-
-## Deploying to the Pi
-
-```bash
-bash scripts/pi_setup.sh                    # on the Pi: apt, hailo-all, PCIe Gen3, venv
-bash scripts/hailo_compile.sh --arch hailo8l # in WSL2 Ubuntu: ONNX -> .hef
-```
-
-**The Hailo compiler is x86_64 Linux only.** Not Windows, not the Pi's ARM CPU.
-On a Windows machine that means WSL2 (`wsl --install -d Ubuntu-22.04`, admin,
-reboot). `hailo_compile.sh` checks `uname -m` and refuses early rather than
-failing halfway through a compile.
-
-Match `--arch` to the board: `hailo8l` = 13-TOPS AI HAT+, `hailo8` = 26-TOPS,
-`hailo10h` = AI HAT+ 2. A mismatched `.hef` compiles cleanly and then refuses to
-load, with an error that never mentions architecture.
-
-Test the `.hef` standalone through `vendor/hailo-rpi5-examples` **before**
-switching the config to `backend: hailo`. Debugging a bad `.hef` and a new engine
-class simultaneously is how a day disappears.
-
-## Optional extras
-
-The core installs with numpy and PyYAML only, so the pipeline and its whole test
-suite run on a laptop with no camera, no autopilot and no GDAL.
-
-| Extra | Brings | Needed for |
-|---|---|---|
-| `mavlink` | pymavlink | Live autopilot telemetry |
-| `camera` | picamera2 | Raspberry Pi camera capture |
-| `cv` | opencv-python-headless | Better inference preprocessing |
-| `geo` | rasterio | GeoTIFF/COG export on the workstation |
-| `onnx` | onnxruntime | ONNX inference backend |
-
-Hailo inference additionally needs HailoRT and a compiled `.hef`; model
-compilation (PyTorch → ONNX → Hailo compiler) is part of the deployment
-workflow, and not every operator survives the trip.
-
-## Data model
-
-Each spooled frame is a lossless `.npy` plus a JSON sidecar carrying telemetry,
-QA results, index summaries, detections, model provenance and CRS. `.npy` because
-it is lossless, needs no encoder dependency, and preserves above-8-bit
-multispectral data; convert to GeoTIFF on the workstation.
-
-```
-Farm -> field -> season -> flight -> sensor -> raw imagery -> calibrated imagery
-     -> orthomosaic -> index/model output -> agronomist observation -> action
-```
-
-Every derived product keeps a pointer back to its raw imagery, flight logs,
-calibration data, model version and CRS. Without that chain, nobody can explain
-why an NDVI anomaly moved between two flights.
-
-## A caution on vegetation indices
-
-`geo/indices.py` returns arithmetic, not agronomy. Comparing NDVI between dates
-is only meaningful when illumination, exposure, reflectance calibration and
-growth stage are all controlled. Uncalibrated digital numbers from a consumer RGB
-sensor produce attractive maps that are agronomically misleading — which is worse
-than no map, because a misleading map gets believed.
-
-`IndexResult.calibrated` stays False for raw digital numbers, and the pipeline
-sets it False for everything it computes on board. Downstream consumers should
-refuse cross-date comparison on uncalibrated results.
-
-## Regulatory context
-
-Canadian operations are governed by Transport Canada Part IX (Basic / Advanced /
-Level 1 Complex / SFOC, plus an RPOC for BVLOS) and, for spraying, Health Canada
-SPN2026-02 of 30 June 2026. A Remote ID rule is pending from NPA 2026-005
-(published 8 June 2026; comments closed 9 September 2026) — reserve power, a
-serial port and physical space for a broadcast module on any custom airframe.
-
-See [the compliance checklist](docs/briefs/04-compliance-checklist.md). Current to
-13 September 2026; re-verify before 31 March 2027.
+No row in `docs/status.md` is marked field-validated. Live camera, a compiled Hailo model, a physical pump, and field radios are blocked on hardware that was not attached. The simulated actuator recording a command is the end of the treatment path. `preflight` checks the edge software. It does not check airspace, weather, or a pesticide label.
