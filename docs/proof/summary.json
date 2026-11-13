@@ -1,0 +1,348 @@
+{
+  "generated_at": "2026-11-13T02:11:22Z",
+  "source_commit": "12b426745c3554d4c58cb50d313f3484528f74ff",
+  "simulated": true,
+  "hardware": false,
+  "sitl_ran": false,
+  "sitl_binary_present": false,
+  "commands": [
+    "python -m agri_edge.cli -c config/demo.yaml preflight --simulate",
+    "python -m agri_edge.cli -c config/demo.yaml fly --simulate --frames 12 --bands red,green,blue,nir,red-edge",
+    "python -m agri_edge.cli indices red,green,nir,red-edge",
+    "python -m agri_edge.cli indices red,green,blue,nir,red-edge",
+    "python training/gsd_calculator.py --camera imx708 --target-size 3",
+    "python training/gsd_calculator.py --camera imx708 --target-size 30",
+    "python training/motion_budget.py --camera imx708 --altitude 30 --target-size 30"
+  ],
+  "fly_stdout_tail": "  Detections are decision support only and must not drive treatment.\n\n\n--- run summary ---\n{\n  \"captured\": 12,\n  \"passed_qa\": 12,\n  \"failed_qa\": 0,\n  \"skipped_no_telemetry\": 0,\n  \"detections\": 12,\n  \"spooled\": 12,\n  \"inference_errors\": 0,\n  \"qa_failure_counts\": {}\n}\n\n--- spool ---\n{\n  \"pending\": 12,\n  \"by_priority\": {\n    \"ANOMALY\": 12\n  },\n  \"total_bytes\": 18482002,\n  \"max_bytes\": 1073741824,\n  \"utilisation\": 0.017212705686688423\n}",
+  "pipeline": {
+    "frames_requested": 12,
+    "captured": 12,
+    "qa_ok": 12,
+    "decision_support_only": true,
+    "validated_locally": false,
+    "may_drive_treatment": false,
+    "detection_count": 12,
+    "straight_line_east_m": 27.51549959179054,
+    "ndvi_means": [
+      0.016283092588885023,
+      0.016196345932670917,
+      0.016277499337937387,
+      0.016214360604357467,
+      0.016258059378213282,
+      0.01626939075327411,
+      0.016276606994403475,
+      0.016293294235966198,
+      0.016230086362063117,
+      0.016261037058470967,
+      0.016254671586807,
+      0.01625957962830612
+    ],
+    "blur_values": [
+      188.97191660237556,
+      190.13557947029793,
+      189.24700537793046,
+      189.7334489181047,
+      188.90495523593833,
+      189.440039272283,
+      189.85921231419385,
+      190.067236383035,
+      188.6102717737838,
+      189.99217951177866,
+      189.73851491733907,
+      190.36085760791616
+    ],
+    "ndvi_frame": {
+      "name": "ndvi",
+      "calibrated": false,
+      "valid_fraction": 1.0,
+      "min": -0.5052631578947369,
+      "p05": -0.3969849246231156,
+      "median": 0.02242152466367713,
+      "p95": 0.47619047619047616,
+      "max": 0.674074074074074,
+      "mean": 0.016283092588885023,
+      "source": "first spooled frame of agri-edge fly --simulate",
+      "display_scale": "nearest-neighbour 2x of the 320x240 frame"
+    }
+  },
+  "decisions": [
+    {
+      "case": "all_gates_pass",
+      "allowed": true,
+      "reasons": [],
+      "gates": {
+        "operator_armed": true,
+        "payload_armed": true,
+        "confidence": true,
+        "model_validated": true,
+        "position": true,
+        "pose": true,
+        "geofence": true,
+        "actuator": true,
+        "mission_state": true,
+        "command": true
+      },
+      "simulated_actuator_commands": 1,
+      "event_counts": {
+        "detected": 1,
+        "treated": 1,
+        "skipped": 0,
+        "outside_geofence": 0,
+        "skip_reasons": {},
+        "simulated": true
+      },
+      "simulated": true
+    },
+    {
+      "case": "operator_not_armed",
+      "allowed": false,
+      "reasons": [
+        "NOT_OPERATOR_ARMED"
+      ],
+      "gates": {
+        "operator_armed": false,
+        "payload_armed": true,
+        "confidence": true,
+        "model_validated": true,
+        "position": true,
+        "pose": true,
+        "geofence": true,
+        "actuator": true,
+        "mission_state": true,
+        "command": true
+      },
+      "simulated_actuator_commands": 0,
+      "event_counts": {
+        "detected": 1,
+        "treated": 0,
+        "skipped": 1,
+        "outside_geofence": 0,
+        "skip_reasons": {
+          "NOT_OPERATOR_ARMED": 1
+        },
+        "simulated": true
+      },
+      "simulated": true
+    },
+    {
+      "case": "model_not_validated",
+      "allowed": false,
+      "reasons": [
+        "MODEL_NOT_VALIDATED"
+      ],
+      "gates": {
+        "operator_armed": true,
+        "payload_armed": true,
+        "confidence": true,
+        "model_validated": false,
+        "position": true,
+        "pose": true,
+        "geofence": true,
+        "actuator": true,
+        "mission_state": true,
+        "command": true
+      },
+      "simulated_actuator_commands": 0,
+      "event_counts": {
+        "detected": 1,
+        "treated": 0,
+        "skipped": 1,
+        "outside_geofence": 0,
+        "skip_reasons": {
+          "MODEL_NOT_VALIDATED": 1
+        },
+        "simulated": true
+      },
+      "simulated": true
+    },
+    {
+      "case": "low_confidence",
+      "allowed": false,
+      "reasons": [
+        "CONFIDENCE_BELOW_THRESHOLD"
+      ],
+      "gates": {
+        "operator_armed": true,
+        "payload_armed": true,
+        "confidence": false,
+        "model_validated": true,
+        "position": true,
+        "pose": true,
+        "geofence": true,
+        "actuator": true,
+        "mission_state": true,
+        "command": true
+      },
+      "simulated_actuator_commands": 0,
+      "event_counts": {
+        "detected": 1,
+        "treated": 0,
+        "skipped": 1,
+        "outside_geofence": 0,
+        "skip_reasons": {
+          "CONFIDENCE_BELOW_THRESHOLD": 1
+        },
+        "simulated": true
+      },
+      "simulated": true
+    },
+    {
+      "case": "outside_geofence",
+      "allowed": false,
+      "reasons": [
+        "OUTSIDE_TREATMENT_GEOFENCE"
+      ],
+      "gates": {
+        "operator_armed": true,
+        "payload_armed": true,
+        "confidence": true,
+        "model_validated": true,
+        "position": true,
+        "pose": true,
+        "geofence": false,
+        "actuator": true,
+        "mission_state": true,
+        "command": true
+      },
+      "simulated_actuator_commands": 0,
+      "event_counts": {
+        "detected": 1,
+        "treated": 0,
+        "skipped": 1,
+        "outside_geofence": 1,
+        "skip_reasons": {
+          "OUTSIDE_TREATMENT_GEOFENCE": 1
+        },
+        "simulated": true
+      },
+      "simulated": true
+    },
+    {
+      "case": "mission_paused",
+      "allowed": false,
+      "reasons": [
+        "MISSION_STATE_NOT_PERMITTED"
+      ],
+      "gates": {
+        "operator_armed": true,
+        "payload_armed": true,
+        "confidence": true,
+        "model_validated": true,
+        "position": true,
+        "pose": true,
+        "geofence": true,
+        "actuator": true,
+        "mission_state": false,
+        "command": true
+      },
+      "simulated_actuator_commands": 0,
+      "event_counts": {
+        "detected": 1,
+        "treated": 0,
+        "skipped": 1,
+        "outside_geofence": 0,
+        "skip_reasons": {
+          "MISSION_STATE_NOT_PERMITTED": 1
+        },
+        "simulated": true
+      },
+      "simulated": true
+    },
+    {
+      "case": "command_expired",
+      "allowed": false,
+      "reasons": [
+        "COMMAND_EXPIRED"
+      ],
+      "gates": {
+        "operator_armed": true,
+        "payload_armed": true,
+        "confidence": true,
+        "model_validated": true,
+        "position": true,
+        "pose": true,
+        "geofence": true,
+        "actuator": true,
+        "mission_state": true,
+        "command": false
+      },
+      "simulated_actuator_commands": 0,
+      "event_counts": {
+        "detected": 1,
+        "treated": 0,
+        "skipped": 1,
+        "outside_geofence": 0,
+        "skip_reasons": {
+          "COMMAND_EXPIRED": 1
+        },
+        "simulated": true
+      },
+      "simulated": true
+    },
+    {
+      "case": "nan_position",
+      "allowed": false,
+      "reasons": [
+        "POSITION_INVALID",
+        "GEOFENCE_NOT_EVALUATED"
+      ],
+      "gates": {
+        "operator_armed": true,
+        "payload_armed": true,
+        "confidence": true,
+        "model_validated": true,
+        "position": false,
+        "pose": true,
+        "geofence": false,
+        "actuator": true,
+        "mission_state": true,
+        "command": true
+      },
+      "simulated_actuator_commands": 0,
+      "event_counts": {
+        "detected": 1,
+        "treated": 0,
+        "skipped": 1,
+        "outside_geofence": 0,
+        "skip_reasons": {
+          "POSITION_INVALID": 1,
+          "GEOFENCE_NOT_EVALUATED": 1
+        },
+        "simulated": true
+      },
+      "simulated": true
+    }
+  ],
+  "decisions_allowed": 1,
+  "decisions_refused": 7,
+  "et0_brussels_mm_day": 3.8802594471140064,
+  "coverage_preview": {
+    "lines": 18,
+    "gap_fraction": 0.031232146257855645,
+    "best_heading_deg": 90.0,
+    "total_distance_m": 4188.0
+  },
+  "coverage": {
+    "swath_m": 30.0,
+    "overlap": 0.2,
+    "spacing_m": 24.0,
+    "best_heading_deg": 90.0,
+    "area_ha": 9.12,
+    "lines": 18,
+    "line_distance_m": 3780.0,
+    "turn_distance_m": 408.0,
+    "total_distance_m": 4188.0,
+    "duration_s_at_5ms_plus_4s_turns": 905.6,
+    "turn_penalty_s": 4.0,
+    "turn_penalty_note": "placeholder in CoveragePlan.estimate_duration_s; not measured on an aircraft",
+    "gap_fraction": 0.031232146257855645,
+    "speed_ms": 5.0,
+    "worst_heading": {
+      "heading_deg": 175.0,
+      "total_distance_m": 5314.37190380147,
+      "turn_distance_m": 1527.6877518088704,
+      "lines": 20
+    }
+  }
+}

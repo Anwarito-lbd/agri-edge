@@ -1,0 +1,31 @@
+$ /usr/bin/python3 -m agri_edge.cli -c /workspace/docs/proof/demo.resolved.yaml fly --simulate --frames 12 --bands red,green,blue,nir,red-edge
+
+Site: demo-laptop | Field: synthetic-straight-line | Bands: red, green, blue, nir, red-edge
+Mode: SIMULATED | Spool: docs/proof/_spool
+
+  NOTE: the loaded model is not marked as locally validated.
+  Detections are decision support only and must not drive treatment.
+
+
+--- run summary ---
+{
+  "captured": 12,
+  "passed_qa": 12,
+  "failed_qa": 0,
+  "skipped_no_telemetry": 0,
+  "detections": 12,
+  "spooled": 12,
+  "inference_errors": 0,
+  "qa_failure_counts": {}
+}
+
+--- spool ---
+{
+  "pending": 12,
+  "by_priority": {
+    "ANOMALY": 12
+  },
+  "total_bytes": 18482002,
+  "max_bytes": 1073741824,
+  "utilisation": 0.017212705686688423
+}

@@ -1,0 +1,32 @@
+$ /usr/bin/python3 /workspace/training/gsd_calculator.py --camera imx708 --target-size 30
+
+camera        : Pi Camera Module 3 (IMX708)
+resolution    : 4608x2592
+model input   : 640x640  (downscale 7.2x when the whole frame is letterboxed)
+target        : 30 cm object, need >= 20 px across
+
+ alt (m)   native GSD  px whole-frame  px tiled   verdict
+------------------------------------------------------------------------
+       1      0.030 cm         141.1    1015.9   OK whole-frame
+       2      0.059 cm          70.5     508.0   OK whole-frame
+       3      0.089 cm          47.0     338.6   OK whole-frame
+       5      0.148 cm          28.2     203.2   OK whole-frame
+      10      0.295 cm          14.1     101.6   TILING REQUIRED
+      15      0.443 cm           9.4      67.7   TILING REQUIRED
+      20      0.591 cm           7.1      50.8   TILING REQUIRED
+      30      0.886 cm           4.7      33.9   TILING REQUIRED
+      50      1.477 cm           2.8      20.3   TILING REQUIRED
+      80      2.362 cm           1.8      12.7   not resolvable
+     120      3.544 cm           1.2       8.5   not resolvable
+
+Ceilings for this target size
+------------------------------------------------------------------------
+  whole-frame inference   up to    7.1 m AGL
+  tiled inference         up to   50.8 m AGL  (7.2x higher, at 52x the inference cost)
+
+  Above the tiled ceiling the object is not in the image in any useful
+  sense. No model recovers it: you need a longer lens, a higher-resolution
+  sensor, or a lower flight.
+
+  Note these are optics ceilings, not recommendations. Motion blur,
+  focus and lighting all degrade real detection well before the limit.

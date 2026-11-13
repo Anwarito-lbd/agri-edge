@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420" role="img">
+<title>Total distance vs flight-line heading</title>
+<rect width="100%" height="100%" fill="#f7f5f0"/>
+<style>text{font-family:Georgia,serif;fill:#1c1915} .small{font-size:12px;fill:#4a453d} .axis{font-size:11px;fill:#4a453d}</style>
+<text x="64" y="26" font-size="16">Total distance vs flight-line heading</text>
+<line x1="64.0" y1="372.0" x2="736.0" y2="372.0" stroke="#1c1915"/>
+<line x1="64.0" y1="372.0" x2="64.0" y2="46.0" stroke="#1c1915"/>
+<polyline fill="none" stroke="#1f6b3a" stroke-width="2" points="64.0,181.9 83.2,155.0 102.4,123.9 121.6,137.5 140.8,94.6 160.0,110.1 179.2,115.9 198.4,119.9 217.6,113.9 236.8,120.7 256.0,184.1 275.2,170.5 294.4,161.4 313.6,164.7 332.8,226.1 352.0,207.1 371.2,254.7 390.4,216.7 409.6,349.5 428.8,309.5 448.0,254.7 467.2,207.1 486.4,201.1 505.6,204.8 524.8,217.6 544.0,138.3 563.2,147.8 582.4,156.6 601.6,113.9 620.8,134.3 640.0,138.2 659.2,110.1 678.4,119.7 697.6,100.1 716.8,123.9 736.0,68.5"/>
+<line x1="550" y1="48" x2="568" y2="48" stroke="#1f6b3a" stroke-width="2"/>
+<text class="small" x="574" y="52">total distance</text>
+<text class="axis" x="400" y="408">heading, degrees counter-clockwise from east</text>
+<text class="axis" x="16" y="209" transform="rotate(-90 16 209)">total distance, m</text>
+</svg>
