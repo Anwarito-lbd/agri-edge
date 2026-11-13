@@ -17,7 +17,7 @@ The farmer-facing site is a separate repository, [agri-edge-web](https://github.
 
 ## What a laptop run actually produced
 
-`python scripts/portfolio_demo.py` on 13 November 2026 at 02:11:22 UTC, on commit `12b4267`, wrote `docs/proof/`. ArduPilot SITL was not started: `vendor/ardupilot` is not in the tree, and `summary.json` records `sitl_ran: false`.
+`python scripts/portfolio_demo.py` wrote `docs/proof/` on 13 November 2026 at 02:11:22 UTC. `summary.json` records `source_commit` `12b4267`, which was HEAD at generation time; the runner itself is part of this change. ArduPilot SITL was not started: `vendor/ardupilot` is not in the tree, and `summary.json` records `sitl_ran: false`.
 
 ### 1. Plan the passes, then play them back
 
